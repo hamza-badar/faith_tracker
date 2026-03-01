@@ -8,18 +8,29 @@ import Skeleton from '@/components/ui/Skeleton';
 import { BookOpen, Minus, Plus } from 'lucide-react';
 
 const MAX_QUARTERS = 120;
-const FRACTION_DISPLAY = { 0: '', 1: '\u00BC', 2: '\u00BD', 3: '\u00BE' };
+
+/** Human-readable labels for Juz fraction (1/4, 1/2, 3/4) */
+const JUZ_FRACTION = {
+  0: '',
+  1: 'quarter',
+  2: 'half',
+  3: 'three-quarters',
+};
 
 function quartersToJuz(q) {
   return { juz: Math.floor(q / 4), fraction: q % 4 };
 }
 
 function formatQuarters(q) {
+  if (q <= 0) return "Let's begin";
+  if (q >= MAX_QUARTERS) return 'Completed';
   const juz = Math.floor(q / 4);
   const frac = q % 4;
-  if (juz === 0) return FRACTION_DISPLAY[frac] || FRACTION_DISPLAY[1];
-  if (frac === 0) return `${juz} Juz`;
-  return `${juz} Juz + ${FRACTION_DISPLAY[frac]}`;
+  const fractionLabel = JUZ_FRACTION[frac];
+  if (!fractionLabel) return `${juz} Juz`;
+  // When in a fraction, we're partway through the next Juz (show 1-based)
+  const displayJuz = juz + 1;
+  return `${displayJuz} Juz + ${fractionLabel}`;
 }
 
 export default function QuranTracker() {
@@ -29,22 +40,20 @@ export default function QuranTracker() {
   const storedJuz = data?.juz ?? 0;
   const storedFraction = data?.fraction ?? 0;
   const storedQuarters = storedJuz * 4 + storedFraction;
-  const currentQuarters = storedQuarters < 1 ? 1 : storedQuarters;
+  const currentQuarters = Math.max(0, Math.min(storedQuarters, MAX_QUARTERS));
 
   const quartersRef = useRef(currentQuarters);
   quartersRef.current = currentQuarters;
 
   const handleIncrement = useCallback(() => {
-    let next = quartersRef.current + 1;
-    if (next > MAX_QUARTERS) next = 1;
+    let next = Math.min(quartersRef.current + 1, MAX_QUARTERS);
     quartersRef.current = next;
     const { juz, fraction } = quartersToJuz(next);
     save({ juz, fraction }).catch(() => toast.error('Failed to update'));
   }, [save]);
 
   const handleDecrement = useCallback(() => {
-    let next = quartersRef.current - 1;
-    if (next < 1) next = MAX_QUARTERS;
+    let next = Math.max(quartersRef.current - 1, 0);
     quartersRef.current = next;
     const { juz, fraction } = quartersToJuz(next);
     save({ juz, fraction }).catch(() => toast.error('Failed to update'));
