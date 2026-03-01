@@ -1,4 +1,4 @@
-const CACHE_NAME = 'faith-tracker-v1';
+const CACHE_NAME = 'faith-tracker-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
@@ -12,8 +12,13 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('firestore.googleapis.com')) return;
-  if (event.request.url.includes('identitytoolkit.googleapis.com')) return;
+  const url = event.request.url;
+  if (
+    url.includes('googleapis.com') ||
+    url.includes('firebaseio.com') ||
+    url.includes('firebase.google.com') ||
+    url.includes('gstatic.com/firebasejs')
+  ) return;
 
   event.respondWith(
     caches.match(event.request).then((cached) => {

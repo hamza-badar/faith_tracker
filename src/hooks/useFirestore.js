@@ -23,6 +23,7 @@ export function useDocument(path) {
     const ref = doc(db, path);
     const unsub = onSnapshot(
       ref,
+      { includeMetadataChanges: true },
       (snap) => {
         setData(snap.exists() ? snap.data() : null);
         setLoading(false);
@@ -66,6 +67,7 @@ export function useCollection(path, orderField = 'createdAt') {
 
     const unsub = onSnapshot(
       q,
+      { includeMetadataChanges: true },
       (snap) => {
         setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
         setLoading(false);

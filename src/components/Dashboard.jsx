@@ -49,7 +49,7 @@ export default function Dashboard() {
           Peace be upon you, {user?.displayName?.split(' ')[0] || 'friend'}. Track your spiritual journey.
         </p>
 
-        <Accordion type="multiple" defaultValue={['quran', 'qaza', 'nafl', 'sajda', 'charity']} className="space-y-4">
+        <Accordion type="single" collapsible className="space-y-4">
 
           <AccordionItem value="quran" className="border-none bg-card rounded-[2rem] shadow-sm border border-border/50 px-2 sm:px-4 overflow-hidden">
             <AccordionTrigger className="hover:no-underline py-5 px-2">
