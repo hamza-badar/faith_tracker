@@ -1,0 +1,17 @@
+{
+  "name": "Faith Tracker",
+  "short_name": "FaithTracker",
+  "description": "Track your prayers, Quran progress, and more",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "display": "standalone",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
