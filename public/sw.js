@@ -1,4 +1,4 @@
-const CACHE_NAME = 'faith-tracker-v2';
+const CACHE_NAME = 'faith-tracker-v3';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
@@ -14,6 +14,7 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = event.request.url;
   if (
+    url.includes('/api/') ||
     url.includes('googleapis.com') ||
     url.includes('firebaseio.com') ||
     url.includes('firebase.google.com') ||

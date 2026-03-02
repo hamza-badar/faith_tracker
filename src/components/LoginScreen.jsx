@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuthContext } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { BookOpen, Heart, Clock, Sun, User } from 'lucide-react';
+import { BookOpen, Heart, Clock, Sun, User, Utensils } from 'lucide-react';
 
 const FEATURES = [
   { icon: BookOpen, label: 'Quran Progress', color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
@@ -9,6 +9,7 @@ const FEATURES = [
   { icon: Sun, label: 'Nafl Tracker', color: 'bg-orange-500/10 text-orange-600 dark:text-orange-400' },
   { icon: User, label: 'Sajda Count', color: 'bg-purple-500/10 text-purple-600 dark:text-purple-400' },
   { icon: Heart, label: 'Charity', color: 'bg-rose-500/10 text-rose-600 dark:text-rose-400' },
+  { icon: Utensils, label: 'Iftar Time', color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
 ];
 
 export default function LoginScreen() {

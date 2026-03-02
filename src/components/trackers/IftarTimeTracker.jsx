@@ -25,13 +25,6 @@ function formatHHMM(t) {
   return `${hour12}:${pad2(t.m)} ${period}`;
 }
 
-function subtractMinutes(t, minutes) {
-  if (!t) return null;
-  let total = (t.h * 60 + t.m) - minutes;
-  total = ((total % 1440) + 1440) % 1440;
-  return { h: Math.floor(total / 60), m: total % 60 };
-}
-
 function formatDateLabel(iso) {
   try {
     const d = new Date(`${iso}T00:00:00`);
@@ -53,38 +46,59 @@ function getLocalISODate() {
   return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
 }
 
-async function fetchAladhanCalendar({ latitude, longitude, month, year, method = 2 }) {
+function formatLocationDetails(details) {
+  if (!details) return '';
+  const parts = [
+    details.name,
+    details.city,
+    details.postcode,
+    details.state,
+    details.country,
+  ].filter((x) => typeof x === 'string' && x.trim());
+  return parts.join(', ');
+}
+
+async function fetchPrayerCalendar({ latitude, longitude, month, year, method = 1, school = 1 }) {
   const params = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
     month: String(month),
     year: String(year),
     method: String(method),
+    school: String(school),
   });
 
-  const candidates = [
-    `/api/prayer-calendar?${params.toString()}`,
-    `https://api.aladhan.com/v1/calendar?${params.toString()}`,
-  ];
-
-  let lastError = null;
-  for (const endpoint of candidates) {
-    try {
-      const res = await fetch(endpoint);
-      if (!res.ok) {
-        throw new Error(`API error (${res.status})`);
-      }
-      const json = await res.json();
-      if (!json || json.code !== 200 || !Array.isArray(json.data)) {
-        throw new Error('Unexpected API response');
-      }
-      return json.data;
-    } catch (err) {
-      lastError = err;
+  let res;
+  try {
+    res = await fetch(`/api/prayer-calendar?${params.toString()}`);
+  } catch (err) {
+    throw new Error(`Network error contacting prayer API: ${err?.message || 'Failed to fetch'}`);
+  }
+  if (!res.ok) {
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const json = await res.json().catch(() => null);
+      const msg = json?.message || json?.error || `API error (${res.status})`;
+      throw new Error(msg);
     }
+    const txt = await res.text().catch(() => '');
+    throw new Error(txt || `API error (${res.status})`);
   }
 
-  throw new Error(lastError?.message || 'Failed to fetch prayer timings.');
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const txt = await res.text().catch(() => '');
+    if (txt.includes('function pad2(') || txt.includes('export default async function handler')) {
+      throw new Error('API route is not executing (receiving source file). Use deployed app or run `vercel dev` instead of `npm run dev`.');
+    }
+    throw new Error(`Prayer API returned non-JSON response${txt ? `: ${txt.slice(0, 120)}` : ''}`);
+  }
+
+  const json = await res.json().catch(() => null);
+  if (!json || json.code !== 200 || !Array.isArray(json.data)) {
+    throw new Error('Unexpected API response');
+  }
+  return json.data;
 }
 
 async function fetchRamadanStatus({ date, latitude, longitude }) {
@@ -109,6 +123,23 @@ async function fetchRamadanStatus({ date, latitude, longitude }) {
   return null;
 }
 
+async function fetchLocationDetails({ latitude, longitude }) {
+  try {
+    const params = new URLSearchParams({
+      lat: String(latitude),
+      lon: String(longitude),
+    });
+    const res = await fetch(`/api/reverse-geocode?${params.toString()}`);
+    if (!res.ok) return null;
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) return null;
+    const json = await res.json();
+    return json?.data || null;
+  } catch {
+    return null;
+  }
+}
+
 export default function IftarTimeTracker() {
   const [status, setStatus] = useState('idle'); // idle | locating | fetching | ready | error
   const [error, setError] = useState('');
@@ -116,6 +147,9 @@ export default function IftarTimeTracker() {
   const [meta, setMeta] = useState(null);
   const [days, setDays] = useState([]);
   const [isRamadanToday, setIsRamadanToday] = useState(false);
+  const [locationDetails, setLocationDetails] = useState(null);
+  const [locationLookupAttempted, setLocationLookupAttempted] = useState(false);
+  const locationText = useMemo(() => formatLocationDetails(locationDetails), [locationDetails]);
 
   const currentMonthYear = useMemo(() => {
     const now = new Date();
@@ -127,6 +161,8 @@ export default function IftarTimeTracker() {
     setDays([]);
     setMeta(null);
     setIsRamadanToday(false);
+    setLocationDetails(null);
+    setLocationLookupAttempted(false);
 
     if (!('geolocation' in navigator)) {
       setStatus('error');
@@ -155,13 +191,18 @@ export default function IftarTimeTracker() {
     setCoords({ latitude, longitude });
 
     setStatus('fetching');
-    const data = await fetchAladhanCalendar({
-      latitude,
-      longitude,
-      month: currentMonthYear.month,
-      year: currentMonthYear.year,
-      method: 2,
-    });
+    const [data, geoDetails] = await Promise.all([
+      fetchPrayerCalendar({
+        latitude,
+        longitude,
+        month: currentMonthYear.month,
+        year: currentMonthYear.year,
+        method: 1,
+        school: 1,
+      }),
+      fetchLocationDetails({ latitude, longitude }),
+    ]);
+    setLocationLookupAttempted(true);
 
     const nowMs = Date.now();
     const todayIso = getLocalISODate();
@@ -171,18 +212,17 @@ export default function IftarTimeTracker() {
       const dayNum = d?.date?.gregorian?.day;
       const isoDate = `${y}-${pad2(mo)}-${pad2(dayNum)}`;
 
-      const fajr = parseHHMM(d?.timings?.Fajr);
-      const maghrib = parseHHMM(d?.timings?.Maghrib);
-      const suhoor = subtractMinutes(fajr, 5);
+      const imsak = parseHHMM(d?.timings?.Imsak || d?.timings?.Fajr);
+      const sunset = parseHHMM(d?.timings?.Sunset || d?.timings?.Maghrib);
 
-      const iftarMs = buildLocalDateTimeMs(isoDate, maghrib);
+      const iftarMs = buildLocalDateTimeMs(isoDate, sunset);
       const isPast = iftarMs ? nowMs > iftarMs : false;
 
       return {
         isoDate,
         dateLabel: formatDateLabel(isoDate),
-        suhoor: formatHHMM(suhoor),
-        iftar: formatHHMM(maghrib),
+        suhoor: formatHHMM(imsak),
+        iftar: formatHHMM(sunset),
         hijriMonthNumber: Number(d?.date?.hijri?.month?.number || 0),
         isPast,
       };
@@ -200,6 +240,7 @@ export default function IftarTimeTracker() {
     const timezone = data?.[0]?.meta?.timezone;
     setMeta({ timezone: timezone || null });
     setDays(mapped);
+    setLocationDetails(geoDetails);
     setStatus('ready');
   }, [currentMonthYear.month, currentMonthYear.year]);
 
@@ -232,7 +273,17 @@ export default function IftarTimeTracker() {
             ) : null}
             {coords && (
               <p className="text-xs text-muted-foreground mt-1">
-                Lat {coords.latitude.toFixed(4)}, Lon {coords.longitude.toFixed(4)}
+                Lat {coords.latitude}, Lon {coords.longitude}
+              </p>
+            )}
+            {locationText && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {locationText}
+              </p>
+            )}
+            {!locationText && locationLookupAttempted && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Location details unavailable
               </p>
             )}
           </div>
@@ -261,9 +312,15 @@ export default function IftarTimeTracker() {
       {status === 'error' ? (
         <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
           <p className="text-sm font-medium text-destructive">{error || 'Failed to load.'}</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Tip: enable location permission for this site, then press Refresh.
-          </p>
+          {error?.toLowerCase().includes('location') ? (
+            <p className="text-xs text-muted-foreground mt-1">
+              Tip: enable location permission for this site, then press Refresh.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-1">
+              Tip: refresh once; if it continues, clear site data and reload to refresh cached assets.
+            </p>
+          )}
         </div>
       ) : null}
 
@@ -271,7 +328,7 @@ export default function IftarTimeTracker() {
         <div className="rounded-3xl border border-border/50 bg-card shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-border/50 bg-secondary/20">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Suhoor time shown already includes 5-minute subtraction from Fajr • Iftar = Maghrib
+              Suhoor = Imsak • Iftar = Sunset
             </p>
           </div>
           <div className="overflow-x-auto">
