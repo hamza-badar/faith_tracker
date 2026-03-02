@@ -10,19 +10,6 @@ function parseHijriMonthNumber(hijriDate) {
   return Number.isFinite(month) ? month : 0;
 }
 
-function subtractFiveMinutes(hhmm) {
-  if (!hhmm || typeof hhmm !== 'string') return null;
-  const match = hhmm.match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return null;
-  const h = Number(match[1]);
-  const m = Number(match[2]);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-  const total = ((h * 60 + m - 5) % 1440 + 1440) % 1440;
-  const outH = Math.floor(total / 60);
-  const outM = total % 60;
-  return `${pad2(outH)}:${pad2(outM)}`;
-}
-
 async function fetchJson(url, headers = { Accept: 'application/json' }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
@@ -57,18 +44,17 @@ function normalizeIslamicApiData(fastingRows, timezone) {
       const isoDate = row?.date;
       const sahur = row?.time?.sahur || null;
       const iftar = row?.time?.iftar || null;
-      const sahurAdjusted = subtractFiveMinutes(sahur);
-      if (!isoDate || !sahurAdjusted || !iftar) return null;
+      if (!isoDate || !sahur || !iftar) return null;
 
       const [y, mo, d] = isoDate.split('-').map(Number);
       if (!y || !mo || !d) return null;
 
       return {
         timings: {
-          Imsak: sahurAdjusted,
-          Sahur: sahurAdjusted,
-          Suhoor: sahurAdjusted,
-          Fajr: sahurAdjusted,
+          Imsak: sahur,
+          Sahur: sahur,
+          Suhoor: sahur,
+          Fajr: sahur,
           Sunset: iftar,
           Iftar: iftar,
           Maghrib: iftar,
@@ -123,7 +109,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ code: 405, status: 'Method Not Allowed' });
   }
 
-  const { latitude, longitude, month, year } = req.query || {};
+  const { latitude, longitude, month, year, source = 'islamicapi' } = req.query || {};
   const apiKey = process.env.ISLAMIC_API_KEY;
 
   if (!latitude || !longitude || !month || !year) {
@@ -134,8 +120,15 @@ export default async function handler(req, res) {
     });
   }
 
-  let aladhanReason = 'IslamicAPI not configured';
-  if (apiKey) {
+  if (source === 'islamicapi') {
+    if (!apiKey) {
+      return res.status(500).json({
+        code: 500,
+        status: 'Server Misconfigured',
+        message: 'Missing ISLAMIC_API_KEY environment variable',
+      });
+    }
+
     try {
       const islamic = await fetchJson(buildIslamicApiUrl({
         latitude,
@@ -160,17 +153,31 @@ export default async function handler(req, res) {
           });
         }
       }
-
-      aladhanReason =
-        islamic.json?.message ||
-        islamic.json?.error ||
-        `IslamicAPI failed with status ${islamic.response.status}`;
+      const status = toHttpStatus(islamic.response.status);
+      return res.status(status).json({
+        code: status,
+        status: 'Upstream Error',
+        message:
+          islamic.networkError ||
+          islamic.json?.message ||
+          islamic.json?.error ||
+          `IslamicAPI failed with status ${islamic.response.status}`,
+      });
     } catch (err) {
-      aladhanReason = err?.message || 'IslamicAPI request failed';
+      return res.status(502).json({
+        code: 502,
+        status: 'Bad Gateway',
+        message: err?.message || 'IslamicAPI request failed',
+      });
     }
   }
-
-  console.warn(`[prayer-calendar] Falling back to AlAdhan. Reason: ${aladhanReason}`);
+  if (source !== 'aladhan' && source !== 'islamicapi') {
+    return res.status(400).json({
+      code: 400,
+      status: 'Bad Request',
+      message: 'Invalid source. Allowed values: islamicapi, aladhan',
+    });
+  }
 
   try {
     const aladhan = await fetchJson(buildAladhanUrl({ latitude, longitude, month, year }));

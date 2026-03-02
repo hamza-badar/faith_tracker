@@ -58,7 +58,7 @@ function formatLocationDetails(details) {
   return parts.join(', ');
 }
 
-async function fetchPrayerCalendar({ latitude, longitude, month, year, method = 1, school = 1 }) {
+async function fetchPrayerCalendar({ latitude, longitude, month, year, method = 1, school = 1, source = 'islamicapi' }) {
   const params = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
@@ -66,6 +66,7 @@ async function fetchPrayerCalendar({ latitude, longitude, month, year, method = 
     year: String(year),
     method: String(method),
     school: String(school),
+    source: String(source),
   });
 
   let res;
@@ -78,11 +79,11 @@ async function fetchPrayerCalendar({ latitude, longitude, month, year, method = 
     const contentType = res.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
       const json = await res.json().catch(() => null);
-      const msg = json?.message || json?.error || `API error (${res.status})`;
+      const msg = `${json?.message || json?.error || `API error (${res.status})`} Please try a different source.`;
       throw new Error(msg);
     }
     const txt = await res.text().catch(() => '');
-    throw new Error(txt || `API error (${res.status})`);
+    throw new Error(`${txt || `API error (${res.status})`} Please try a different source.`);
   }
 
   const contentType = res.headers.get('content-type') || '';
@@ -152,7 +153,14 @@ export default function IftarTimeTracker() {
   const [isRamadanToday, setIsRamadanToday] = useState(false);
   const [locationDetails, setLocationDetails] = useState(null);
   const [locationLookupAttempted, setLocationLookupAttempted] = useState(false);
-  const [timingProvider, setTimingProvider] = useState('unknown');
+  const [timingSource, setTimingSource] = useState(() => {
+    try {
+      const saved = localStorage.getItem('iftar_timing_source');
+      return saved === 'aladhan' ? 'aladhan' : 'islamicapi';
+    } catch {
+      return 'islamicapi';
+    }
+  });
   const locationText = useMemo(() => formatLocationDetails(locationDetails), [locationDetails]);
 
   const currentMonthYear = useMemo(() => {
@@ -167,7 +175,6 @@ export default function IftarTimeTracker() {
     setIsRamadanToday(false);
     setLocationDetails(null);
     setLocationLookupAttempted(false);
-    setTimingProvider('unknown');
 
     if (!('geolocation' in navigator)) {
       setStatus('error');
@@ -196,7 +203,7 @@ export default function IftarTimeTracker() {
     setCoords({ latitude, longitude });
 
     setStatus('fetching');
-    const [{ data, provider }, geoDetails] = await Promise.all([
+    const [{ data }, geoDetails] = await Promise.all([
       fetchPrayerCalendar({
         latitude,
         longitude,
@@ -204,11 +211,11 @@ export default function IftarTimeTracker() {
         year: currentMonthYear.year,
         method: 1,
         school: 1,
+        source: timingSource,
       }),
       fetchLocationDetails({ latitude, longitude }),
     ]);
     setLocationLookupAttempted(true);
-    setTimingProvider(provider);
 
     const nowMs = Date.now();
     const todayIso = getLocalISODate();
@@ -257,7 +264,15 @@ export default function IftarTimeTracker() {
     setDays(mapped);
     setLocationDetails(geoDetails);
     setStatus('ready');
-  }, [currentMonthYear.month, currentMonthYear.year]);
+  }, [currentMonthYear.month, currentMonthYear.year, timingSource]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('iftar_timing_source', timingSource);
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [timingSource]);
 
   useEffect(() => {
     load().catch((e) => {
@@ -301,6 +316,31 @@ export default function IftarTimeTracker() {
                 Location details unavailable
               </p>
             )}
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Source:</span>
+              <button
+                type="button"
+                onClick={() => setTimingSource('islamicapi')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${
+                  timingSource === 'islamicapi'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card text-foreground border-border'
+                }`}
+              >
+                IslamicAPI
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimingSource('aladhan')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${
+                  timingSource === 'aladhan'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card text-foreground border-border'
+                }`}
+              >
+                AlAdhan
+              </button>
+            </div>
           </div>
         </div>
 
@@ -343,9 +383,7 @@ export default function IftarTimeTracker() {
         <div className="rounded-3xl border border-border/50 bg-card shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-border/50 bg-secondary/20">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              {timingProvider === 'islamicapi'
-                ? 'Sahur shown already includes 5-minute subtraction (IslamicAPI) • Iftar = Iftar'
-                : 'Sahur = Imsak • Iftar = Sunset'}
+              Monthly Timings
             </p>
           </div>
           <div className="overflow-x-auto">
