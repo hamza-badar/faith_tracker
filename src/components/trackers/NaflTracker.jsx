@@ -29,7 +29,7 @@ function formatDate(dateStr) {
 
 export default function NaflTracker() {
   const { user } = useAuthContext();
-  const { items, loading, add, remove } = useCollection(`users/${user.uid}/nafl`);
+  const { items, loading, add, remove } = useCollection(`users/${user.uid}/nafl`, 'createdAt', { serverOnly: true });
   const [isOpen, setIsOpen] = useState(false);
   const [date, setDate] = useState(today());
   const [reason, setReason] = useState('');

@@ -12,7 +12,8 @@ import QuranTracker from '@/components/trackers/QuranTracker';
 import SajdaTracker from '@/components/trackers/SajdaTracker';
 import QazaTracker from '@/components/trackers/QazaTracker';
 import CharityTracker from '@/components/trackers/CharityTracker';
-import { BookOpen, User, Sun, Clock, Heart, LogOut } from 'lucide-react';
+import IftarTimeTracker from '@/components/trackers/IftarTimeTracker';
+import { BookOpen, User, Sun, Clock, Heart, LogOut, Utensils } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function Dashboard() {
@@ -123,6 +124,21 @@ export default function Dashboard() {
             </AccordionTrigger>
             <AccordionContent className="px-2">
               <CharityTracker />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="iftar" className="border-none bg-card rounded-[2rem] shadow-sm border border-border/50 px-2 sm:px-4 overflow-hidden">
+            <AccordionTrigger className="hover:no-underline py-5 px-2">
+              <div className="flex items-center gap-3 text-left">
+                <div className="p-2 bg-secondary rounded-xl text-primary"><Utensils className="w-5 h-5" /></div>
+                <div>
+                  <h2 className="font-display text-xl font-semibold">Iftar Time</h2>
+                  <p className="text-sm font-normal text-muted-foreground">Suhoor & Iftar for this month</p>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-2">
+              <IftarTimeTracker />
             </AccordionContent>
           </AccordionItem>
 

@@ -43,11 +43,12 @@ function formatDate(dateStr) {
 }
 
 function useAllQazaData(uid) {
-  const fajr = useCollection(`users/${uid}/qaza/Fajr/entries`);
-  const zuhr = useCollection(`users/${uid}/qaza/Zuhr/entries`);
-  const asr = useCollection(`users/${uid}/qaza/Asr/entries`);
-  const maghrib = useCollection(`users/${uid}/qaza/Maghrib/entries`);
-  const isha = useCollection(`users/${uid}/qaza/Isha/entries`);
+  const opts = { serverOnly: true };
+  const fajr = useCollection(`users/${uid}/qaza/Fajr/entries`, 'createdAt', opts);
+  const zuhr = useCollection(`users/${uid}/qaza/Zuhr/entries`, 'createdAt', opts);
+  const asr = useCollection(`users/${uid}/qaza/Asr/entries`, 'createdAt', opts);
+  const maghrib = useCollection(`users/${uid}/qaza/Maghrib/entries`, 'createdAt', opts);
+  const isha = useCollection(`users/${uid}/qaza/Isha/entries`, 'createdAt', opts);
 
   const prayerData = { Fajr: fajr, Zuhr: zuhr, Asr: asr, Maghrib: maghrib, Isha: isha };
   const loading = Object.values(prayerData).some((d) => d.loading);

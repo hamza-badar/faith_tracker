@@ -2,8 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import {
   initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
+  memoryLocalCache,
   enableNetwork,
 } from 'firebase/firestore';
 
@@ -28,7 +27,8 @@ if (firebaseConfigured) {
   auth = getAuth(app);
   googleProvider = new GoogleAuthProvider();
   db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    // Avoid persistent browser caching (IndexedDB). Reads are configured to be server-only.
+    localCache: memoryLocalCache(),
   });
 
   document.addEventListener('visibilitychange', () => {

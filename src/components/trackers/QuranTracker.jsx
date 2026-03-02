@@ -35,7 +35,7 @@ function formatQuarters(q) {
 
 export default function QuranTracker() {
   const { user } = useAuthContext();
-  const { data, loading, save } = useDocument(`users/${user.uid}/quran/progress`);
+  const { data, loading, save } = useDocument(`users/${user.uid}/quran/progress`, { serverOnly: true });
 
   const storedJuz = data?.juz ?? 0;
   const storedFraction = data?.fraction ?? 0;

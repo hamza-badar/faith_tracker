@@ -8,7 +8,7 @@ import { Heart } from 'lucide-react';
 
 export default function CharityTracker() {
   const { user } = useAuthContext();
-  const { data, loading, save } = useDocument(`users/${user.uid}/charity/amount`);
+  const { data, loading, save } = useDocument(`users/${user.uid}/charity/amount`, { serverOnly: true });
   const [localAmount, setLocalAmount] = useState('');
 
   const amount = data?.amount ?? 0;
