@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Spinner from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/button';
 import { MapPin, RefreshCw } from 'lucide-react';
+import { Coordinates, CalculationMethod, PrayerTimes } from 'adhan';
 
 function pad2(n) {
   return String(n).padStart(2, '0');
@@ -32,6 +33,11 @@ function formatDateLabel(iso) {
   } catch {
     return iso;
   }
+}
+
+function formatCoord(value) {
+  if (!Number.isFinite(value)) return '—';
+  return value.toFixed(4);
 }
 
 function buildLocalDateTimeMs(isoDate, time) {
@@ -105,6 +111,52 @@ async function fetchPrayerCalendar({ latitude, longitude, month, year, method = 
   };
 }
 
+function formatPrayerTime(dateValue) {
+  if (!(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) return null;
+  return `${pad2(dateValue.getHours())}:${pad2(dateValue.getMinutes())}`;
+}
+
+function buildManualPrayerCalendar({ latitude, longitude, month, year }) {
+  const coordinates = new Coordinates(latitude, longitude);
+  const params = CalculationMethod.Karachi();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+
+
+  const data = Array.from({ length: daysInMonth }, (_, index) => {
+    const day = index + 1;
+    const date = new Date(year, month - 1, day);
+    const prayerTimes = new PrayerTimes(coordinates, date, params);
+    const fajr = formatPrayerTime(prayerTimes.fajr);
+    const maghrib = formatPrayerTime(prayerTimes.maghrib);
+
+    return {
+      date: {
+        gregorian: {
+          year: String(year),
+          month: { number: month },
+          day: String(day),
+        },
+      },
+      timings: {
+        Fajr: fajr,
+        Sunset: maghrib,
+        Iftar: maghrib,
+        Maghrib: maghrib,
+      },
+      meta: {
+        timezone,
+      },
+    };
+  });
+
+  return {
+    data,
+    provider: 'adhan-manual',
+    timezone,
+  };
+}
+
 async function fetchRamadanStatus({ date, latitude, longitude }) {
   if (!date) return null;
   const params = new URLSearchParams({
@@ -153,14 +205,7 @@ export default function IftarTimeTracker() {
   const [isRamadanToday, setIsRamadanToday] = useState(false);
   const [locationDetails, setLocationDetails] = useState(null);
   const [locationLookupAttempted, setLocationLookupAttempted] = useState(false);
-  const [timingSource, setTimingSource] = useState(() => {
-    try {
-      const saved = localStorage.getItem('iftar_timing_source');
-      return saved === 'aladhan' ? 'aladhan' : 'islamicapi';
-    } catch {
-      return 'islamicapi';
-    }
-  });
+  const [timingSource, setTimingSource] = useState('manual');
   const locationText = useMemo(() => formatLocationDetails(locationDetails), [locationDetails]);
 
   const currentMonthYear = useMemo(() => {
@@ -203,18 +248,26 @@ export default function IftarTimeTracker() {
     setCoords({ latitude, longitude });
 
     setStatus('fetching');
-    const [{ data }, geoDetails] = await Promise.all([
-      fetchPrayerCalendar({
-        latitude,
-        longitude,
-        month: currentMonthYear.month,
-        year: currentMonthYear.year,
-        method: 1,
-        school: 1,
-        source: timingSource,
-      }),
+    const [calendar, geoDetails] = await Promise.all([
+      timingSource === 'manual'
+        ? Promise.resolve(buildManualPrayerCalendar({
+            latitude,
+            longitude,
+            month: currentMonthYear.month,
+            year: currentMonthYear.year,
+          }))
+        : fetchPrayerCalendar({
+            latitude,
+            longitude,
+            month: currentMonthYear.month,
+            year: currentMonthYear.year,
+            method: 1,
+            school: 1,
+            source: timingSource,
+          }),
       fetchLocationDetails({ latitude, longitude }),
     ]);
+    const { data, timezone: manualTimezone } = calendar;
     setLocationLookupAttempted(true);
 
     const nowMs = Date.now();
@@ -259,20 +312,12 @@ export default function IftarTimeTracker() {
     });
     setIsRamadanToday(ramadanStatus?.isRamadan ?? fallbackIsRamadan);
 
-    const timezone = data?.[0]?.meta?.timezone;
+    const timezone = manualTimezone || data?.[0]?.meta?.timezone;
     setMeta({ timezone: timezone || null });
     setDays(mapped);
     setLocationDetails(geoDetails);
     setStatus('ready');
   }, [currentMonthYear.month, currentMonthYear.year, timingSource]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('iftar_timing_source', timingSource);
-    } catch {
-      // Ignore storage errors.
-    }
-  }, [timingSource]);
 
   useEffect(() => {
     load().catch((e) => {
@@ -283,12 +328,12 @@ export default function IftarTimeTracker() {
 
   return (
     <div className="pt-4 pb-2 space-y-4">
-      <div className="flex items-start justify-between gap-4 bg-secondary/30 p-6 rounded-3xl border border-border/50">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between bg-secondary/30 p-6 rounded-3xl border border-border/50">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
             <MapPin className="w-6 h-6" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h3 className={`text-xl font-display font-semibold ${isRamadanToday ? 'ramadan-glow text-emerald-700 dark:text-emerald-300' : 'text-foreground'}`}>
               Iftar Time
             </h3>
@@ -302,8 +347,8 @@ export default function IftarTimeTracker() {
               </p>
             ) : null}
             {coords && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Lat {coords.latitude}, Lon {coords.longitude}
+              <p className="text-xs text-muted-foreground mt-1 break-words">
+                Lat {formatCoord(coords.latitude)}, Lon {formatCoord(coords.longitude)}
               </p>
             )}
             {locationText && (
@@ -316,30 +361,43 @@ export default function IftarTimeTracker() {
                 Location details unavailable
               </p>
             )}
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 flex flex-col items-start gap-2 sm:flex-row sm:items-center">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Source:</span>
-              <button
-                type="button"
-                onClick={() => setTimingSource('islamicapi')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${
-                  timingSource === 'islamicapi'
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-card text-foreground border-border'
-                }`}
-              >
-                IslamicAPI
-              </button>
-              <button
-                type="button"
-                onClick={() => setTimingSource('aladhan')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${
-                  timingSource === 'aladhan'
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-card text-foreground border-border'
-                }`}
-              >
-                AlAdhan
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTimingSource('islamicapi')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap ${
+                    timingSource === 'islamicapi'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card text-foreground border-border'
+                  }`}
+                >
+                  IslamicAPI
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimingSource('aladhan')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap ${
+                    timingSource === 'aladhan'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card text-foreground border-border'
+                  }`}
+                >
+                  AlAdhan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimingSource('manual')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap ${
+                    timingSource === 'manual'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card text-foreground border-border'
+                  }`}
+                >
+                  Manual
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -347,7 +405,7 @@ export default function IftarTimeTracker() {
         <Button
           variant="outline"
           size="sm"
-          className="rounded-xl border-border/50 shadow-sm"
+          className="rounded-xl border-border/50 shadow-sm self-start sm:self-auto"
           onClick={() => load().catch((e) => { setStatus('error'); setError(e?.message || 'Something went wrong.'); })}
         >
           <RefreshCw className="w-4 h-4 mr-2" />
