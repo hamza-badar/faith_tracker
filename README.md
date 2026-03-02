@@ -53,7 +53,7 @@ npx vercel --prod
 ```
 
 Or connect your GitHub repo to Vercel for automatic deploys.
-Set all `VITE_FIREBASE_*` environment variables plus `GEOAPIFY_API_KEY` in your Vercel project settings.
+Set all `VITE_FIREBASE_*` environment variables plus `ISLAMIC_API_KEY` and `GEOAPIFY_API_KEY` in your Vercel project settings.
 
 ## Tech Stack
 

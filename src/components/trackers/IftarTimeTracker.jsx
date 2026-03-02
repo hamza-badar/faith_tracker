@@ -98,7 +98,10 @@ async function fetchPrayerCalendar({ latitude, longitude, month, year, method = 
   if (!json || json.code !== 200 || !Array.isArray(json.data)) {
     throw new Error('Unexpected API response');
   }
-  return json.data;
+  return {
+    data: json.data,
+    provider: json.provider || 'unknown',
+  };
 }
 
 async function fetchRamadanStatus({ date, latitude, longitude }) {
@@ -149,6 +152,7 @@ export default function IftarTimeTracker() {
   const [isRamadanToday, setIsRamadanToday] = useState(false);
   const [locationDetails, setLocationDetails] = useState(null);
   const [locationLookupAttempted, setLocationLookupAttempted] = useState(false);
+  const [timingProvider, setTimingProvider] = useState('unknown');
   const locationText = useMemo(() => formatLocationDetails(locationDetails), [locationDetails]);
 
   const currentMonthYear = useMemo(() => {
@@ -163,6 +167,7 @@ export default function IftarTimeTracker() {
     setIsRamadanToday(false);
     setLocationDetails(null);
     setLocationLookupAttempted(false);
+    setTimingProvider('unknown');
 
     if (!('geolocation' in navigator)) {
       setStatus('error');
@@ -191,7 +196,7 @@ export default function IftarTimeTracker() {
     setCoords({ latitude, longitude });
 
     setStatus('fetching');
-    const [data, geoDetails] = await Promise.all([
+    const [{ data, provider }, geoDetails] = await Promise.all([
       fetchPrayerCalendar({
         latitude,
         longitude,
@@ -203,6 +208,7 @@ export default function IftarTimeTracker() {
       fetchLocationDetails({ latitude, longitude }),
     ]);
     setLocationLookupAttempted(true);
+    setTimingProvider(provider);
 
     const nowMs = Date.now();
     const todayIso = getLocalISODate();
@@ -212,8 +218,17 @@ export default function IftarTimeTracker() {
       const dayNum = d?.date?.gregorian?.day;
       const isoDate = `${y}-${pad2(mo)}-${pad2(dayNum)}`;
 
-      const imsak = parseHHMM(d?.timings?.Imsak || d?.timings?.Fajr);
-      const sunset = parseHHMM(d?.timings?.Sunset || d?.timings?.Maghrib);
+      const imsak = parseHHMM(
+        d?.timings?.Imsak ||
+        d?.timings?.Suhoor ||
+        d?.timings?.Sahur ||
+        d?.timings?.Fajr
+      );
+      const sunset = parseHHMM(
+        d?.timings?.Sunset ||
+        d?.timings?.Iftar ||
+        d?.timings?.Maghrib
+      );
 
       const iftarMs = buildLocalDateTimeMs(isoDate, sunset);
       const isPast = iftarMs ? nowMs > iftarMs : false;
@@ -221,7 +236,7 @@ export default function IftarTimeTracker() {
       return {
         isoDate,
         dateLabel: formatDateLabel(isoDate),
-        suhoor: formatHHMM(imsak),
+        sahur: formatHHMM(imsak),
         iftar: formatHHMM(sunset),
         hijriMonthNumber: Number(d?.date?.hijri?.month?.number || 0),
         isPast,
@@ -328,7 +343,9 @@ export default function IftarTimeTracker() {
         <div className="rounded-3xl border border-border/50 bg-card shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-border/50 bg-secondary/20">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Suhoor = Imsak • Iftar = Sunset
+              {timingProvider === 'islamicapi'
+                ? 'Sahur shown already includes 5-minute subtraction (IslamicAPI) • Iftar = Iftar'
+                : 'Sahur = Imsak • Iftar = Sunset'}
             </p>
           </div>
           <div className="overflow-x-auto">
@@ -336,7 +353,7 @@ export default function IftarTimeTracker() {
               <thead>
                 <tr className="text-left text-muted-foreground border-b border-border/50">
                   <th className="px-5 py-3 font-semibold">Date</th>
-                  <th className="px-5 py-3 font-semibold">Suhoor</th>
+                  <th className="px-5 py-3 font-semibold">Sahur</th>
                   <th className="px-5 py-3 font-semibold">Iftar</th>
                 </tr>
               </thead>
@@ -348,7 +365,7 @@ export default function IftarTimeTracker() {
                   return (
                     <tr key={row.isoDate} className="border-b last:border-b-0 border-border/40">
                       <td className={cell}>{row.dateLabel}</td>
-                      <td className={cell}>{row.suhoor}</td>
+                      <td className={cell}>{row.sahur}</td>
                       <td className={cell}>{row.iftar}</td>
                     </tr>
                   );

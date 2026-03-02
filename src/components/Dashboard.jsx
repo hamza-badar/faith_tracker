@@ -133,7 +133,7 @@ export default function Dashboard() {
                 <div className="p-2 bg-secondary rounded-xl text-primary"><Utensils className="w-5 h-5" /></div>
                 <div>
                   <h2 className="font-display text-xl font-semibold">Iftar Time</h2>
-                  <p className="text-sm font-normal text-muted-foreground">Suhoor & Iftar for this month</p>
+                  <p className="text-sm font-normal text-muted-foreground">Sahur & Iftar for this month</p>
                 </div>
               </div>
             </AccordionTrigger>
