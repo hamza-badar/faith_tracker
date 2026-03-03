@@ -2,6 +2,10 @@ function pad2(n) {
   return String(n).padStart(2, '0');
 }
 
+const MONTH_CACHE_TTL_MS = 1000 * 60 * 60 * 12;
+const prayerCalendarCache = globalThis.__prayerCalendarCache || new Map();
+globalThis.__prayerCalendarCache = prayerCalendarCache;
+
 function parseHijriMonthNumber(hijriDate) {
   if (!hijriDate || typeof hijriDate !== 'string') return 0;
   const parts = hijriDate.split('-');
@@ -77,6 +81,36 @@ function normalizeIslamicApiData(fastingRows, timezone) {
     .filter(Boolean);
 }
 
+function makeCacheKey({ source, latitude, longitude, month, year, method, school }) {
+  return [
+    source,
+    Number(latitude).toFixed(4),
+    Number(longitude).toFixed(4),
+    Number(month),
+    Number(year),
+    Number(method || 1),
+    Number(school || 1),
+  ].join(':');
+}
+
+function getCachedPayload(key, forceRefresh) {
+  if (forceRefresh) return null;
+  const cached = prayerCalendarCache.get(key);
+  if (!cached) return null;
+  if (Date.now() > cached.expiresAt) {
+    prayerCalendarCache.delete(key);
+    return null;
+  }
+  return cached.payload;
+}
+
+function setCachedPayload(key, payload) {
+  prayerCalendarCache.set(key, {
+    payload,
+    expiresAt: Date.now() + MONTH_CACHE_TTL_MS,
+  });
+}
+
 function buildAladhanUrl({ latitude, longitude, month, year }) {
   const url = new URL(`https://api.aladhan.com/v1/calendar/${year}/${month}`);
   url.searchParams.set('latitude', String(latitude));
@@ -91,12 +125,13 @@ function buildAladhanUrl({ latitude, longitude, month, year }) {
 }
 
 function buildIslamicApiUrl({ latitude, longitude, month, year, apiKey }) {
-  const url = new URL('https://islamicapi.com/api/v1/fasting/');
+  const url = new URL('https://islamicapi.com/api/v1/ramadan/');
   url.searchParams.set('lat', String(latitude));
   url.searchParams.set('lon', String(longitude));
   url.searchParams.set('method', '1');
   url.searchParams.set('api_key', String(apiKey));
-  url.searchParams.set('date', `${year}-${pad2(month)}`);
+  // The ramadan endpoint returns the full fasting month in one response.
+  // month/year are still accepted by our API for a stable client contract.
   return url.toString();
 }
 
@@ -109,8 +144,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ code: 405, status: 'Method Not Allowed' });
   }
 
-  const { latitude, longitude, month, year, source = 'islamicapi' } = req.query || {};
+  const { latitude, longitude, month, year, source = 'islamicapi', forceRefresh = 'false' } = req.query || {};
   const apiKey = process.env.ISLAMIC_API_KEY;
+  const shouldForceRefresh = String(forceRefresh).toLowerCase() === 'true';
 
   if (!latitude || !longitude || !month || !year) {
     return res.status(400).json({
@@ -118,6 +154,31 @@ export default async function handler(req, res) {
       status: 'Bad Request',
       message: 'Missing required query params: latitude, longitude, month, year',
     });
+  }
+
+  if (source !== 'aladhan' && source !== 'islamicapi') {
+    return res.status(400).json({
+      code: 400,
+      status: 'Bad Request',
+      message: 'Invalid source. Allowed values: islamicapi, aladhan',
+    });
+  }
+
+  const cacheKey = makeCacheKey({
+    source,
+    latitude,
+    longitude,
+    month,
+    year,
+    method: 1,
+    school: 1,
+  });
+
+  const cached = getCachedPayload(cacheKey, shouldForceRefresh);
+  if (cached) {
+    res.setHeader('X-Cache', 'HIT');
+    res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=1800');
+    return res.status(200).json(cached);
   }
 
   if (source === 'islamicapi') {
@@ -144,13 +205,16 @@ export default async function handler(req, res) {
       if (islamic.response.ok && Array.isArray(fastingRows) && fastingRows.length) {
         const normalized = normalizeIslamicApiData(fastingRows, 'Asia/Kolkata');
         if (normalized.length) {
-          res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=1800');
-          return res.status(200).json({
+          const payload = {
             code: 200,
             status: 'OK',
             provider: 'islamicapi',
             data: normalized,
-          });
+          };
+          setCachedPayload(cacheKey, payload);
+          res.setHeader('X-Cache', 'MISS');
+          res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=1800');
+          return res.status(200).json(payload);
         }
       }
       const status = toHttpStatus(islamic.response.status);
@@ -171,14 +235,6 @@ export default async function handler(req, res) {
       });
     }
   }
-  if (source !== 'aladhan' && source !== 'islamicapi') {
-    return res.status(400).json({
-      code: 400,
-      status: 'Bad Request',
-      message: 'Invalid source. Allowed values: islamicapi, aladhan',
-    });
-  }
-
   try {
     const aladhan = await fetchJson(buildAladhanUrl({ latitude, longitude, month, year }));
     if (!aladhan.response.ok) {
@@ -202,13 +258,16 @@ export default async function handler(req, res) {
       });
     }
 
-    res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=1800');
-    return res.status(200).json({
+    const payload = {
       code: 200,
       status: 'OK',
       provider: 'aladhan',
       data: aladhan.json.data,
-    });
+    };
+    setCachedPayload(cacheKey, payload);
+    res.setHeader('X-Cache', 'MISS');
+    res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=1800');
+    return res.status(200).json(payload);
   } catch (error) {
     return res.status(502).json({
       code: 502,

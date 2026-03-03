@@ -4,6 +4,11 @@ import { Button } from '@/components/ui/button';
 import { MapPin, RefreshCw } from 'lucide-react';
 import { Coordinates, CalculationMethod, PrayerTimes } from 'adhan';
 
+const MONTH_CACHE_PREFIX = 'iftar_month_cache_v1';
+const RAMADAN_STATUS_CACHE_PREFIX = 'ramadan_status_cache_v1';
+const GEOCODE_CACHE_PREFIX = 'geocode_cache_v1';
+const ONE_DAY_MS = 1000 * 60 * 60 * 24;
+
 function pad2(n) {
   return String(n).padStart(2, '0');
 }
@@ -64,7 +69,40 @@ function formatLocationDetails(details) {
   return parts.join(', ');
 }
 
-async function fetchPrayerCalendar({ latitude, longitude, month, year, method = 1, school = 1, source = 'islamicapi' }) {
+async function fetchPrayerCalendar({
+  latitude,
+  longitude,
+  month,
+  year,
+  method = 1,
+  school = 1,
+  source = 'islamicapi',
+  forceRefresh = false,
+}) {
+  const cacheKey = [
+    MONTH_CACHE_PREFIX,
+    source,
+    Number(latitude).toFixed(4),
+    Number(longitude).toFixed(4),
+    Number(year),
+    Number(month),
+    Number(method),
+    Number(school),
+  ].join(':');
+  if (!forceRefresh) {
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed?.data) && typeof parsed?.provider === 'string') {
+          return parsed;
+        }
+      }
+    } catch {
+      // Ignore invalid cache data.
+    }
+  }
+
   const params = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
@@ -73,6 +111,7 @@ async function fetchPrayerCalendar({ latitude, longitude, month, year, method = 
     method: String(method),
     school: String(school),
     source: String(source),
+    forceRefresh: forceRefresh ? 'true' : 'false',
   });
 
   let res;
@@ -105,10 +144,18 @@ async function fetchPrayerCalendar({ latitude, longitude, month, year, method = 
   if (!json || json.code !== 200 || !Array.isArray(json.data)) {
     throw new Error('Unexpected API response');
   }
-  return {
+  const payload = {
     data: json.data,
     provider: json.provider || 'unknown',
   };
+
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify(payload));
+  } catch {
+    // Ignore storage write errors.
+  }
+
+  return payload;
 }
 
 function formatPrayerTime(dateValue) {
@@ -157,8 +204,32 @@ function buildManualPrayerCalendar({ latitude, longitude, month, year }) {
   };
 }
 
-async function fetchRamadanStatus({ date, latitude, longitude }) {
+async function fetchRamadanStatus({ date, latitude, longitude, forceRefresh = false }) {
   if (!date) return null;
+  const cacheKey = [
+    RAMADAN_STATUS_CACHE_PREFIX,
+    date,
+    Number(latitude).toFixed(4),
+    Number(longitude).toFixed(4),
+  ].join(':');
+  if (!forceRefresh) {
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          typeof parsed?.isRamadan === 'boolean' &&
+          Number.isFinite(parsed?.cachedAt) &&
+          Date.now() - parsed.cachedAt < ONE_DAY_MS
+        ) {
+          return { isRamadan: parsed.isRamadan, source: parsed.source || 'cache' };
+        }
+      }
+    } catch {
+      // Ignore invalid cache entries.
+    }
+  }
+
   const params = new URLSearchParams({
     date,
     latitude: String(latitude),
@@ -170,7 +241,16 @@ async function fetchRamadanStatus({ date, latitude, longitude }) {
     if (!res.ok) return null;
     const json = await res.json();
     if (typeof json?.isRamadan === 'boolean') {
-      return { isRamadan: json.isRamadan, source: 'munafio' };
+      const payload = { isRamadan: json.isRamadan, source: 'munafio' };
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({
+          ...payload,
+          cachedAt: Date.now(),
+        }));
+      } catch {
+        // Ignore storage write errors.
+      }
+      return payload;
     }
   } catch {
     // Fallback handled by caller.
@@ -179,7 +259,24 @@ async function fetchRamadanStatus({ date, latitude, longitude }) {
   return null;
 }
 
-async function fetchLocationDetails({ latitude, longitude }) {
+async function fetchLocationDetails({ latitude, longitude, forceRefresh = false }) {
+  const cacheKey = [
+    GEOCODE_CACHE_PREFIX,
+    Number(latitude).toFixed(4),
+    Number(longitude).toFixed(4),
+  ].join(':');
+  if (!forceRefresh) {
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch {
+      // Ignore invalid cache entries.
+    }
+  }
+
   try {
     const params = new URLSearchParams({
       lat: String(latitude),
@@ -190,7 +287,15 @@ async function fetchLocationDetails({ latitude, longitude }) {
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) return null;
     const json = await res.json();
-    return json?.data || null;
+    const payload = json?.data || null;
+    if (payload) {
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(payload));
+      } catch {
+        // Ignore storage write errors.
+      }
+    }
+    return payload;
   } catch {
     return null;
   }
@@ -213,7 +318,7 @@ export default function IftarTimeTracker() {
     return { month: now.getMonth() + 1, year: now.getFullYear() };
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ forceRefresh = false } = {}) => {
     setError('');
     setDays([]);
     setMeta(null);
@@ -264,8 +369,9 @@ export default function IftarTimeTracker() {
             method: 1,
             school: 1,
             source: timingSource,
+            forceRefresh,
           }),
-      fetchLocationDetails({ latitude, longitude }),
+      fetchLocationDetails({ latitude, longitude, forceRefresh }),
     ]);
     const { data, timezone: manualTimezone } = calendar;
     setLocationLookupAttempted(true);
@@ -309,6 +415,7 @@ export default function IftarTimeTracker() {
       date: todayIso,
       latitude,
       longitude,
+      forceRefresh,
     });
     setIsRamadanToday(ramadanStatus?.isRamadan ?? fallbackIsRamadan);
 
@@ -406,7 +513,7 @@ export default function IftarTimeTracker() {
           variant="outline"
           size="sm"
           className="rounded-xl border-border/50 shadow-sm self-start sm:self-auto"
-          onClick={() => load().catch((e) => { setStatus('error'); setError(e?.message || 'Something went wrong.'); })}
+          onClick={() => load({ forceRefresh: true }).catch((e) => { setStatus('error'); setError(e?.message || 'Something went wrong.'); })}
         >
           <RefreshCw className="w-4 h-4 mr-2" />
           Refresh
