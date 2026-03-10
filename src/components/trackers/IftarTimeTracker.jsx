@@ -555,18 +555,20 @@ export default function IftarTimeTracker() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-muted-foreground border-b border-border/50">
+                  <th className="px-5 py-3 font-semibold">S No.</th>
                   <th className="px-5 py-3 font-semibold">Date</th>
                   <th className="px-5 py-3 font-semibold">Sahur</th>
                   <th className="px-5 py-3 font-semibold">Iftar</th>
                 </tr>
               </thead>
               <tbody>
-                {days.map((row) => {
+                {days.map((row, index) => {
                   const cell = row.isPast
                     ? 'px-5 py-3 text-muted-foreground line-through opacity-70'
                     : 'px-5 py-3 text-foreground';
                   return (
                     <tr key={row.isoDate} className="border-b last:border-b-0 border-border/40">
+                      <td className={cell}>{index + 1}</td>
                       <td className={cell}>{row.dateLabel}</td>
                       <td className={cell}>{row.sahur}</td>
                       <td className={cell}>{row.iftar}</td>

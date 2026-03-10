@@ -34,6 +34,8 @@
     --border: 40 10% 88%;
     --input: 40 10% 88%;
     --ring: 24 10% 35%;
+    --opposite-theme-text: 20 14% 15%;
+    --opposite-theme-glow: rgba(32, 26, 22, 0.3);
 
     --radius: 1rem;
   }
@@ -66,6 +68,8 @@
     --border: 20 8% 24%;
     --input: 20 8% 24%;
     --ring: 40 15% 85%;
+    --opposite-theme-text: 40 20% 96%;
+    --opposite-theme-glow: rgba(248, 244, 232, 0.4);
   }
 
   * {
@@ -94,6 +98,13 @@
 
   .glass-panel {
     @apply bg-card/80 backdrop-blur-xl border border-border/50 shadow-lg shadow-black/5;
+  }
+
+  .opposite-theme-signature {
+    color: hsl(var(--opposite-theme-text));
+    text-shadow:
+      0 0 10px var(--opposite-theme-glow),
+      0 0 22px var(--opposite-theme-glow);
   }
 }
 

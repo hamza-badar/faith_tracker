@@ -30,7 +30,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6 py-12 relative overflow-hidden">
+    <div className="relative flex min-h-screen flex-col overflow-hidden px-6 py-12">
       <div className="absolute top-4 right-4 z-10">
         <ThemeToggle />
       </div>
@@ -40,7 +40,8 @@ export default function LoginScreen() {
         <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-accent/30 blur-3xl" />
       </div>
 
-      <div className="w-full max-w-sm text-center relative z-10">
+      <div className="relative z-10 flex flex-1 items-center justify-center">
+        <div className="w-full max-w-sm text-center">
         {/* Geometric pattern accent */}
         <div className="mb-8 flex justify-center">
           <div className="relative">
@@ -102,11 +103,17 @@ export default function LoginScreen() {
           <p className="mt-4 text-sm text-destructive font-medium">{error}</p>
         )}
 
-        {/* Footer note */}
-        <p className="mt-8 text-xs text-muted-foreground/60">
-          Your data syncs securely across all your devices
-        </p>
+          <p className="mt-8 text-xs text-muted-foreground/60">
+            Your data syncs securely across all your devices
+          </p>
+        </div>
       </div>
+
+      <footer className="relative z-10 mt-10 text-center">
+        <p className="opposite-theme-signature font-display text-sm font-semibold tracking-wide sm:text-base">
+          Made with 🤲🏻 by Hamza
+        </p>
+      </footer>
     </div>
   );
 }

@@ -20,7 +20,7 @@ export default function Dashboard() {
   const { user, logout } = useAuthContext();
 
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen pb-10">
       <header className="sticky top-0 z-50 w-full glass-panel border-x-0 border-t-0 rounded-none px-4 sm:px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="px-3 py-1.5 bg-primary text-primary-foreground rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
@@ -144,6 +144,12 @@ export default function Dashboard() {
 
         </Accordion>
       </main>
+
+      <footer className="px-4 pt-10 pb-4 text-center sm:px-6">
+        <p className="opposite-theme-signature font-display text-sm font-semibold tracking-wide sm:text-base">
+          Made with 🤲🏻 by Hamza
+        </p>
+      </footer>
     </div>
   );
 }
