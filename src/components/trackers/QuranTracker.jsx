@@ -5,6 +5,7 @@ import { useDocument } from '@/hooks/useFirestore';
 import { useLongPress } from '@/hooks/useLongPress';
 import { Button } from '@/components/ui/button';
 import Skeleton from '@/components/ui/Skeleton';
+import { formatUncheckedSajdaReminder, getUncheckedSajdaJuz } from '@/lib/sajda';
 import { BookOpen, Minus, Plus } from 'lucide-react';
 
 const MAX_QUARTERS = 120;
@@ -36,6 +37,7 @@ function formatQuarters(q) {
 export default function QuranTracker() {
   const { user } = useAuthContext();
   const { data, loading, save } = useDocument(`users/${user.uid}/quran/progress`, { serverOnly: true });
+  const buttonDoc = useDocument(`users/${user.uid}/sajda/tilawatButtons`, { serverOnly: true });
 
   const storedJuz = data?.juz ?? 0;
   const storedFraction = data?.fraction ?? 0;
@@ -49,8 +51,15 @@ export default function QuranTracker() {
     let next = Math.min(quartersRef.current + 1, MAX_QUARTERS);
     quartersRef.current = next;
     const { juz, fraction } = quartersToJuz(next);
+    const missingSajda = getUncheckedSajdaJuz(buttonDoc.data?.pressed, juz);
+    const reminderMessage = formatUncheckedSajdaReminder(missingSajda);
+
+    if (reminderMessage) {
+      toast(reminderMessage, { id: 'sajda-tilawat-reminder' });
+    }
+
     save({ juz, fraction }).catch(() => toast.error('Failed to update'));
-  }, [save]);
+  }, [buttonDoc.data?.pressed, save]);
 
   const handleDecrement = useCallback(() => {
     let next = Math.max(quartersRef.current - 1, 0);

@@ -5,11 +5,10 @@ import { useDocument } from '@/hooks/useFirestore';
 import { useLongPress } from '@/hooks/useLongPress';
 import { Button } from '@/components/ui/button';
 import Skeleton from '@/components/ui/Skeleton';
+import { SAJDA_BUTTONS } from '@/lib/sajda';
 import { User, Minus, Plus } from 'lucide-react';
 import { arrayRemove, arrayUnion, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-
-const SAJDA_BUTTONS = [9, 13, 14, 15, 16, 17, 19, 19, 21, 23, 24, 27, 30, 30];
 
 export default function SajdaTracker() {
   const { user } = useAuthContext();
