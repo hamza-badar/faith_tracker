@@ -34,6 +34,22 @@ function formatQuarters(q) {
   return `${displayJuz} Juz + ${fractionLabel}`;
 }
 
+function formatLastUpdated(value) {
+  if (!value) return null;
+
+  const date = typeof value?.toDate === 'function'
+    ? value.toDate()
+    : new Date(value);
+
+  if (Number.isNaN(date.getTime())) return null;
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
+}
+
 export default function QuranTracker() {
   const { user } = useAuthContext();
   const { data, loading, save } = useDocument(`users/${user.uid}/quran/progress`, { serverOnly: true });
@@ -43,6 +59,7 @@ export default function QuranTracker() {
   const storedFraction = data?.fraction ?? 0;
   const storedQuarters = storedJuz * 4 + storedFraction;
   const currentQuarters = Math.max(0, Math.min(storedQuarters, MAX_QUARTERS));
+  const lastUpdated = formatLastUpdated(data?.updatedAt);
 
   const quartersRef = useRef(currentQuarters);
   quartersRef.current = currentQuarters;
@@ -58,14 +75,14 @@ export default function QuranTracker() {
       toast(reminderMessage, { id: 'sajda-tilawat-reminder' });
     }
 
-    save({ juz, fraction }).catch(() => toast.error('Failed to update'));
+    save({ juz, fraction, updatedAt: Date.now() }).catch(() => toast.error('Failed to update'));
   }, [buttonDoc.data?.pressed, save]);
 
   const handleDecrement = useCallback(() => {
     let next = Math.max(quartersRef.current - 1, 0);
     quartersRef.current = next;
     const { juz, fraction } = quartersToJuz(next);
-    save({ juz, fraction }).catch(() => toast.error('Failed to update'));
+    save({ juz, fraction, updatedAt: Date.now() }).catch(() => toast.error('Failed to update'));
   }, [save]);
 
   const incrementPress = useLongPress(handleIncrement);
@@ -87,6 +104,11 @@ export default function QuranTracker() {
               {formatQuarters(currentQuarters)}
             </h3>
             <p className="text-sm text-muted-foreground font-medium">Quran Recitation</p>
+            {lastUpdated && (
+              <p className="mt-0.5 text-[11px] font-medium leading-none text-accent-foreground/70">
+                Last updated {lastUpdated}
+              </p>
+            )}
           </div>
         </div>
 
