@@ -43,11 +43,15 @@ function formatLastUpdated(value) {
 
   if (Number.isNaN(date.getTime())) return null;
 
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date);
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const startOfUpdatedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayDifference = Math.max(0, Math.floor((startOfToday - startOfUpdatedDate) / 86400000));
+
+  if (dayDifference === 0) return 'today';
+  if (dayDifference === 1) return 'yesterday';
+
+  return `${dayDifference} days ago`;
 }
 
 export default function QuranTracker() {
