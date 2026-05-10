@@ -5,7 +5,7 @@ import { MapPin, RefreshCw } from 'lucide-react';
 import { Coordinates, CalculationMethod, PrayerTimes } from 'adhan';
 
 const MONTH_CACHE_PREFIX = 'iftar_month_cache_v1';
-const RAMADAN_STATUS_CACHE_PREFIX = 'ramadan_status_cache_v1';
+const RAMADAN_STATUS_CACHE_PREFIX = 'ramadan_status_cache_v2';
 const GEOCODE_CACHE_PREFIX = 'geocode_cache_v1';
 const ONE_DAY_MS = 1000 * 60 * 60 * 24;
 
@@ -411,13 +411,14 @@ export default function IftarTimeTracker() {
 
     const todayEntry = mapped.find((d) => d.isoDate === todayIso) || null;
     const fallbackIsRamadan = todayEntry?.hijriMonthNumber === 9;
+    const hasFastForToday = Boolean(todayEntry && todayEntry.sahur !== '—' && todayEntry.iftar !== '—');
     const ramadanStatus = await fetchRamadanStatus({
       date: todayIso,
       latitude,
       longitude,
       forceRefresh,
     });
-    setIsRamadanToday(ramadanStatus?.isRamadan ?? fallbackIsRamadan);
+    setIsRamadanToday(hasFastForToday && (ramadanStatus?.isRamadan ?? fallbackIsRamadan));
 
     const timezone = manualTimezone || data?.[0]?.meta?.timezone;
     setMeta({ timezone: timezone || null });

@@ -6,12 +6,29 @@ import { Input } from '@/components/ui/input';
 import Skeleton from '@/components/ui/Skeleton';
 import { Heart } from 'lucide-react';
 
+function formatLastUpdated(value) {
+  if (!value) return null;
+
+  const date = typeof value?.toDate === 'function'
+    ? value.toDate()
+    : new Date(value);
+
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 export default function CharityTracker() {
   const { user } = useAuthContext();
   const { data, loading, save } = useDocument(`users/${user.uid}/charity/amount`, { serverOnly: true });
   const [localAmount, setLocalAmount] = useState('');
 
   const amount = data?.amount ?? 0;
+  const lastUpdated = formatLastUpdated(data?.updatedAt);
 
   useEffect(() => {
     if (data !== null && data !== undefined) {
@@ -28,7 +45,7 @@ export default function CharityTracker() {
     const validNum = isNaN(num) ? 0 : num;
 
     if (validNum !== amount) {
-      save({ amount: validNum }).catch(() => toast.error('Failed to update'));
+      save({ amount: validNum, updatedAt: Date.now() }).catch(() => toast.error('Failed to update'));
     }
     setLocalAmount(String(validNum));
   };
@@ -41,6 +58,11 @@ export default function CharityTracker() {
         </div>
         <div className="flex-1">
           <p className="text-sm text-muted-foreground font-medium mb-1">To Give (Charity / Zakat)</p>
+          {lastUpdated && (
+            <p className="mb-2 text-[11px] font-medium leading-none text-accent-foreground/70">
+              Last updated {lastUpdated}
+            </p>
+          )}
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-display font-medium text-lg">
               $

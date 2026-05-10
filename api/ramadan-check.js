@@ -23,9 +23,6 @@ function inferRamadanFromObject(obj) {
     if (value && typeof value === 'object') {
       const nested = inferRamadanFromObject(value);
       if (typeof nested === 'boolean') return nested;
-    } else {
-      const v = findBooleanRamadanFlag(value);
-      if (typeof v === 'boolean') return v;
     }
   }
 
@@ -72,8 +69,8 @@ export default async function handler(req, res) {
       } else {
         const text = await response.text();
         const lowered = text.toLowerCase();
-        if (lowered.includes('not ramadan')) inferred = false;
-        if (inferred === null && lowered.includes('ramadan')) inferred = true;
+        if (/\b(not|outside|after|before)\s+ramadan\b/.test(lowered)) inferred = false;
+        if (inferred === null && /\b(is|in|during)\s+ramadan\b|\bramadan\s+(is\s+)?active\b/.test(lowered)) inferred = true;
       }
 
       if (typeof inferred === 'boolean') {
