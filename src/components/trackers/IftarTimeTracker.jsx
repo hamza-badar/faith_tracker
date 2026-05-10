@@ -6,8 +6,24 @@ import { Coordinates, CalculationMethod, PrayerTimes } from 'adhan';
 
 const MONTH_CACHE_PREFIX = 'iftar_month_cache_v1';
 const RAMADAN_STATUS_CACHE_PREFIX = 'ramadan_status_cache_v2';
-const GEOCODE_CACHE_PREFIX = 'geocode_cache_v1';
 const ONE_DAY_MS = 1000 * 60 * 60 * 24;
+const SOURCE_OPTIONS = [
+  {
+    value: 'islamicapi',
+    label: 'IslamicAPI',
+    description: 'Prayer and fasting times are fetched from islamicapi.com.',
+  },
+  {
+    value: 'aladhan',
+    label: 'AlAdhan',
+    description: 'Prayer times are fetched from aladhan.com.',
+  },
+  {
+    value: 'manual',
+    label: 'Manual',
+    description: 'Prayer times are calculated by this app using your current location.',
+  },
+];
 
 function pad2(n) {
   return String(n).padStart(2, '0');
@@ -40,11 +56,6 @@ function formatDateLabel(iso) {
   }
 }
 
-function formatCoord(value) {
-  if (!Number.isFinite(value)) return '—';
-  return value.toFixed(4);
-}
-
 function buildLocalDateTimeMs(isoDate, time) {
   if (!isoDate || !time) return null;
   const [y, mo, d] = isoDate.split('-').map((x) => Number(x));
@@ -55,18 +66,6 @@ function buildLocalDateTimeMs(isoDate, time) {
 function getLocalISODate() {
   const now = new Date();
   return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
-}
-
-function formatLocationDetails(details) {
-  if (!details) return '';
-  const parts = [
-    details.name,
-    details.city,
-    details.postcode,
-    details.state,
-    details.country,
-  ].filter((x) => typeof x === 'string' && x.trim());
-  return parts.join(', ');
 }
 
 async function fetchPrayerCalendar({
@@ -259,59 +258,12 @@ async function fetchRamadanStatus({ date, latitude, longitude, forceRefresh = fa
   return null;
 }
 
-async function fetchLocationDetails({ latitude, longitude, forceRefresh = false }) {
-  const cacheKey = [
-    GEOCODE_CACHE_PREFIX,
-    Number(latitude).toFixed(4),
-    Number(longitude).toFixed(4),
-  ].join(':');
-  if (!forceRefresh) {
-    try {
-      const raw = localStorage.getItem(cacheKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') return parsed;
-      }
-    } catch {
-      // Ignore invalid cache entries.
-    }
-  }
-
-  try {
-    const params = new URLSearchParams({
-      lat: String(latitude),
-      lon: String(longitude),
-    });
-    const res = await fetch(`/api/reverse-geocode?${params.toString()}`);
-    if (!res.ok) return null;
-    const contentType = res.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) return null;
-    const json = await res.json();
-    const payload = json?.data || null;
-    if (payload) {
-      try {
-        localStorage.setItem(cacheKey, JSON.stringify(payload));
-      } catch {
-        // Ignore storage write errors.
-      }
-    }
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
 export default function IftarTimeTracker() {
   const [status, setStatus] = useState('idle'); // idle | locating | fetching | ready | error
   const [error, setError] = useState('');
-  const [coords, setCoords] = useState(null);
-  const [meta, setMeta] = useState(null);
   const [days, setDays] = useState([]);
   const [isRamadanToday, setIsRamadanToday] = useState(false);
-  const [locationDetails, setLocationDetails] = useState(null);
-  const [locationLookupAttempted, setLocationLookupAttempted] = useState(false);
   const [timingSource, setTimingSource] = useState('manual');
-  const locationText = useMemo(() => formatLocationDetails(locationDetails), [locationDetails]);
 
   const currentMonthYear = useMemo(() => {
     const now = new Date();
@@ -321,10 +273,7 @@ export default function IftarTimeTracker() {
   const load = useCallback(async ({ forceRefresh = false } = {}) => {
     setError('');
     setDays([]);
-    setMeta(null);
     setIsRamadanToday(false);
-    setLocationDetails(null);
-    setLocationLookupAttempted(false);
 
     if (!('geolocation' in navigator)) {
       setStatus('error');
@@ -350,31 +299,26 @@ export default function IftarTimeTracker() {
 
     const latitude = position.coords.latitude;
     const longitude = position.coords.longitude;
-    setCoords({ latitude, longitude });
 
     setStatus('fetching');
-    const [calendar, geoDetails] = await Promise.all([
-      timingSource === 'manual'
-        ? Promise.resolve(buildManualPrayerCalendar({
-            latitude,
-            longitude,
-            month: currentMonthYear.month,
-            year: currentMonthYear.year,
-          }))
-        : fetchPrayerCalendar({
-            latitude,
-            longitude,
-            month: currentMonthYear.month,
-            year: currentMonthYear.year,
-            method: 1,
-            school: 1,
-            source: timingSource,
-            forceRefresh,
-          }),
-      fetchLocationDetails({ latitude, longitude, forceRefresh }),
-    ]);
-    const { data, timezone: manualTimezone } = calendar;
-    setLocationLookupAttempted(true);
+    const calendar = timingSource === 'manual'
+      ? buildManualPrayerCalendar({
+          latitude,
+          longitude,
+          month: currentMonthYear.month,
+          year: currentMonthYear.year,
+        })
+      : await fetchPrayerCalendar({
+          latitude,
+          longitude,
+          month: currentMonthYear.month,
+          year: currentMonthYear.year,
+          method: 1,
+          school: 1,
+          source: timingSource,
+          forceRefresh,
+        });
+    const { data } = calendar;
 
     const nowMs = Date.now();
     const todayIso = getLocalISODate();
@@ -420,10 +364,7 @@ export default function IftarTimeTracker() {
     });
     setIsRamadanToday(hasFastForToday && (ramadanStatus?.isRamadan ?? fallbackIsRamadan));
 
-    const timezone = manualTimezone || data?.[0]?.meta?.timezone;
-    setMeta({ timezone: timezone || null });
     setDays(mapped);
-    setLocationDetails(geoDetails);
     setStatus('ready');
   }, [currentMonthYear.month, currentMonthYear.year, timingSource]);
 
@@ -445,66 +386,40 @@ export default function IftarTimeTracker() {
             <h3 className={`text-xl font-display font-semibold ${isRamadanToday ? 'ramadan-glow text-emerald-700 dark:text-emerald-300' : 'text-foreground'}`}>
               Iftar Time
             </h3>
-            <p className="text-sm text-muted-foreground font-medium">
-              {currentMonthYear.month}/{currentMonthYear.year}
-              {meta?.timezone ? ` • ${meta.timezone}` : ''}
+            <p className={`text-xs mt-1 font-semibold ${
+              isRamadanToday
+                ? 'text-emerald-700 dark:text-emerald-300'
+                : 'text-muted-foreground'
+            }`}>
+              {isRamadanToday ? 'Ramadan is active for today' : 'Ramadan is not active for today'}
             </p>
-            {isRamadanToday ? (
-              <p className="text-xs mt-1 font-semibold text-emerald-700 dark:text-emerald-300">
-                Ramadan is active for today
-              </p>
-            ) : null}
-            {coords && (
-              <p className="text-xs text-muted-foreground mt-1 break-words">
-                Lat {formatCoord(coords.latitude)}, Lon {formatCoord(coords.longitude)}
-              </p>
-            )}
-            {locationText && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {locationText}
-              </p>
-            )}
-            {!locationText && locationLookupAttempted && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Location details unavailable
-              </p>
-            )}
             <div className="mt-3 flex flex-col items-start gap-2 sm:flex-row sm:items-center">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Source:</span>
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setTimingSource('islamicapi')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap ${
-                    timingSource === 'islamicapi'
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-card text-foreground border-border'
-                  }`}
-                >
-                  IslamicAPI
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTimingSource('aladhan')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap ${
-                    timingSource === 'aladhan'
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-card text-foreground border-border'
-                  }`}
-                >
-                  AlAdhan
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTimingSource('manual')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap ${
-                    timingSource === 'manual'
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-card text-foreground border-border'
-                  }`}
-                >
-                  Manual
-                </button>
+                {SOURCE_OPTIONS.map((source) => (
+                  <span key={source.value} className="relative inline-flex group">
+                    <button
+                      type="button"
+                      title={source.description}
+                      aria-describedby={`iftar-source-${source.value}`}
+                      onClick={() => setTimingSource(source.value)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap ${
+                        timingSource === source.value
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-card text-foreground border-border'
+                      }`}
+                    >
+                      {source.label}
+                    </button>
+                    <span
+                      id={`iftar-source-${source.value}`}
+                      role="tooltip"
+                      className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-lg border border-border bg-popover px-3 py-2 text-left text-xs font-medium leading-snug text-popover-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+                    >
+                      {source.description}
+                    </span>
+                  </span>
+                ))}
               </div>
             </div>
           </div>
