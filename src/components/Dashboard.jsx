@@ -62,7 +62,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-2" forceMount>
+            <AccordionContent className="px-2">
               <QuranTracker />
             </AccordionContent>
           </AccordionItem>
@@ -77,7 +77,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-2" forceMount>
+            <AccordionContent className="px-2">
               <QazaTracker />
             </AccordionContent>
           </AccordionItem>
@@ -92,7 +92,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-2" forceMount>
+            <AccordionContent className="px-2">
               <NaflTracker />
             </AccordionContent>
           </AccordionItem>
@@ -107,7 +107,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-2" forceMount>
+            <AccordionContent className="px-2">
               <SajdaTracker />
             </AccordionContent>
           </AccordionItem>
@@ -122,7 +122,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-2" forceMount>
+            <AccordionContent className="px-2">
               <CharityTracker />
             </AccordionContent>
           </AccordionItem>
