@@ -56,8 +56,8 @@ function formatLastUpdated(value) {
 
 export default function QuranTracker() {
   const { user } = useAuthContext();
-  const { data, loading, save } = useDocument(`users/${user.uid}/quran/progress`, { serverOnly: true });
-  const buttonDoc = useDocument(`users/${user.uid}/sajda/tilawatButtons`, { serverOnly: true });
+  const { data, loading, save } = useDocument(`users/${user.uid}/quran/progress`);
+  const buttonDoc = useDocument(`users/${user.uid}/sajda/tilawatButtons`);
 
   const storedJuz = data?.juz ?? 0;
   const storedFraction = data?.fraction ?? 0;

@@ -8,13 +8,10 @@ import {
   deleteDoc,
   query,
   orderBy,
-  getDocFromServer,
-  getDocsFromServer,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-export function useDocument(path, options = {}) {
-  const { serverOnly = false } = options;
+export function useDocument(path) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -24,25 +21,9 @@ export function useDocument(path, options = {}) {
       return;
     }
     setLoading(true);
-    const ref = doc(db, path);
-
-    if (serverOnly) {
-      getDocFromServer(ref)
-        .then((snap) => {
-          setData(snap.exists() ? snap.data() : null);
-          setLoading(false);
-        })
-        .catch((err) => {
-          console.error(`Firestore server doc error [${path}]:`, err);
-          setLoading(false);
-        });
-    }
-
     const unsub = onSnapshot(
-      ref,
-      { includeMetadataChanges: true },
+      doc(db, path),
       (snap) => {
-        if (serverOnly && snap.metadata.fromCache) return;
         setData(snap.exists() ? snap.data() : null);
         setLoading(false);
       },
@@ -52,7 +33,7 @@ export function useDocument(path, options = {}) {
       }
     );
     return unsub;
-  }, [path, serverOnly]);
+  }, [path]);
 
   const save = useCallback(
     async (newData) => {
@@ -65,8 +46,7 @@ export function useDocument(path, options = {}) {
   return { data, loading, save };
 }
 
-export function useCollection(path, orderField = 'createdAt', options = {}) {
-  const { serverOnly = false } = options;
+export function useCollection(path, orderField = 'createdAt') {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -85,23 +65,9 @@ export function useCollection(path, orderField = 'createdAt', options = {}) {
       q = ref;
     }
 
-    if (serverOnly) {
-      getDocsFromServer(q)
-        .then((snap) => {
-          setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-          setLoading(false);
-        })
-        .catch((err) => {
-          console.error(`Firestore server collection error [${path}]:`, err);
-          setLoading(false);
-        });
-    }
-
     const unsub = onSnapshot(
       q,
-      { includeMetadataChanges: true },
       (snap) => {
-        if (serverOnly && snap.metadata.fromCache) return;
         setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
         setLoading(false);
       },
@@ -111,7 +77,7 @@ export function useCollection(path, orderField = 'createdAt', options = {}) {
       }
     );
     return unsub;
-  }, [path, orderField, serverOnly]);
+  }, [path, orderField]);
 
   const add = useCallback(
     async (item) => {

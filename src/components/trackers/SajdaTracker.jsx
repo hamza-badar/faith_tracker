@@ -12,9 +12,9 @@ import { db } from '@/lib/firebase';
 
 export default function SajdaTracker() {
   const { user } = useAuthContext();
-  const { data, loading, save } = useDocument(`users/${user.uid}/sajda/count`, { serverOnly: true });
+  const { data, loading, save } = useDocument(`users/${user.uid}/sajda/count`);
   const buttonDocPath = `users/${user.uid}/sajda/tilawatButtons`;
-  const buttonDoc = useDocument(buttonDocPath, { serverOnly: true });
+  const buttonDoc = useDocument(buttonDocPath);
 
   const count = data?.count ?? 0;
   const countRef = useRef(count);
