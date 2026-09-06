@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider, firebaseConfigured } from '@/lib/firebase';
+import { mergeLocalIntoCloud } from '@/lib/syncLocalToCloud';
 
 export function useAuth() {
   const [user, setUser] = useState(null);
@@ -11,7 +12,15 @@ export function useAuth() {
       setLoading(false);
       return;
     }
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          await mergeLocalIntoCloud(firebaseUser.uid);
+        } catch (err) {
+          console.error('Failed to merge local data into cloud:', err);
+        }
+      }
       setUser(firebaseUser);
       setLoading(false);
     });

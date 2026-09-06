@@ -15,9 +15,11 @@ import CharityTracker from '@/components/trackers/CharityTracker';
 import IftarTimeTracker from '@/components/trackers/IftarTimeTracker';
 import { BookOpen, User, Sun, Clock, Heart, LogOut, Utensils } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SignInButton } from '@/components/LoginScreen';
 
 export default function Dashboard() {
   const { user, logout } = useAuthContext();
+  const firstName = user?.displayName?.split(' ')[0];
 
   return (
     <div className="min-h-screen pb-10">
@@ -33,22 +35,31 @@ export default function Dashboard() {
         <div className="flex items-center gap-1.5">
           <ExportButton />
           <ThemeToggle />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={logout}
-            className="rounded-full w-10 h-10 text-muted-foreground hover:text-foreground"
-            title="Logout"
-          >
-            <LogOut className="h-5 w-5" />
-          </Button>
+          {user ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={logout}
+              className="rounded-full w-10 h-10 text-muted-foreground hover:text-foreground"
+              title="Logout"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
+          ) : (
+            <SignInButton />
+          )}
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 mt-8 space-y-6">
         <p className="text-muted-foreground font-medium px-2 mb-8">
-          Peace be upon you, {user?.displayName?.split(' ')[0] || 'friend'}. Track your spiritual journey.
+          Peace be upon you{firstName ? `, ${firstName}` : ''}. Track your spiritual journey.
         </p>
+        {!user && (
+          <p className="text-sm text-muted-foreground px-2 -mt-4 mb-8">
+            Progress is saved in this browser. Sign in only if you want to sync across devices.
+          </p>
+        )}
 
         <Accordion type="single" collapsible className="space-y-4">
 

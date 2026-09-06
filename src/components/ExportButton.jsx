@@ -1,10 +1,11 @@
-import { useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuthContext } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useState } from 'react';
+import { exportLocalData } from '@/lib/localStore';
 
 async function fetchAllData(uid) {
   const basePath = `users/${uid}`;
@@ -39,7 +40,7 @@ export default function ExportButton() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const data = await fetchAllData(user.uid);
+      const data = user?.uid && db ? await fetchAllData(user.uid) : exportLocalData();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

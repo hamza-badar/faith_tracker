@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { useAuthContext } from '@/context/AuthContext';
 import { useCollection } from '@/hooks/useFirestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,12 +41,12 @@ function formatDate(dateStr) {
   }
 }
 
-function useAllQazaData(uid) {
-  const fajr = useCollection(`users/${uid}/qaza/Fajr/entries`);
-  const zuhr = useCollection(`users/${uid}/qaza/Zuhr/entries`);
-  const asr = useCollection(`users/${uid}/qaza/Asr/entries`);
-  const maghrib = useCollection(`users/${uid}/qaza/Maghrib/entries`);
-  const isha = useCollection(`users/${uid}/qaza/Isha/entries`);
+function useAllQazaData() {
+  const fajr = useCollection('qaza/Fajr/entries');
+  const zuhr = useCollection('qaza/Zuhr/entries');
+  const asr = useCollection('qaza/Asr/entries');
+  const maghrib = useCollection('qaza/Maghrib/entries');
+  const isha = useCollection('qaza/Isha/entries');
 
   const prayerData = { Fajr: fajr, Zuhr: zuhr, Asr: asr, Maghrib: maghrib, Isha: isha };
   const loading = Object.values(prayerData).some((d) => d.loading);
@@ -66,8 +65,7 @@ function useAllQazaData(uid) {
 }
 
 export default function QazaTracker() {
-  const { user } = useAuthContext();
-  const { prayerData, loading, totalCount, allEntries } = useAllQazaData(user.uid);
+  const { prayerData, loading, totalCount, allEntries } = useAllQazaData();
   const [isOpen, setIsOpen] = useState(false);
   const [prayer, setPrayer] = useState('Fajr');
   const [date, setDate] = useState(today());

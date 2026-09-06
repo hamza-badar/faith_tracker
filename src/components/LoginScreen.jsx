@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { useAuthContext } from '@/context/AuthContext';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { BookOpen, Heart, Clock, Sun, User, Utensils } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 const FEATURES = [
   { icon: BookOpen, label: 'Quran Progress', color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
@@ -12,17 +19,21 @@ const FEATURES = [
   { icon: Utensils, label: 'Iftar Time', color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
 ];
 
-export default function LoginScreen() {
-  const { loginWithGoogle } = useAuthContext();
+export default function SignInDialog({ trigger }) {
+  const { loginWithGoogle, firebaseConfigured } = useAuthContext();
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  if (!firebaseConfigured) return null;
 
   const handleLogin = async () => {
     setLoading(true);
     setError('');
     try {
       await loginWithGoogle();
-    } catch (err) {
+      setOpen(false);
+    } catch {
       setError('Failed to sign in. Please try again.');
     } finally {
       setLoading(false);
@@ -30,45 +41,18 @@ export default function LoginScreen() {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden px-6 py-12">
-      <div className="absolute top-4 right-4 z-10">
-        <ThemeToggle />
-      </div>
-
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-accent/30 blur-3xl" />
-      </div>
-
-      <div className="relative z-10 flex flex-1 items-center justify-center">
-        <div className="w-full max-w-sm text-center">
-        {/* Geometric pattern accent */}
-        <div className="mb-8 flex justify-center">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-[1.75rem] bg-primary text-primary-foreground flex items-center justify-center shadow-xl shadow-primary/25">
-              <svg viewBox="0 0 24 24" className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-              </svg>
-            </div>
-            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-lg bg-accent border-2 border-background" />
-            <div className="absolute -bottom-1 -left-1 w-4 h-4 rounded-md bg-secondary border-2 border-background" />
-          </div>
-        </div>
-
-        {/* Brand */}
-        <div className="mb-3 flex items-center justify-center gap-2">
-          <div className="px-4 py-1.5 bg-primary text-primary-foreground rounded-xl flex items-center justify-center">
-            <span className="font-display font-bold text-2xl leading-none tracking-tight">Deen</span>
-          </div>
-          <span className="font-display text-2xl font-semibold tracking-tight text-foreground">Tracker</span>
-        </div>
-
-        <p className="text-muted-foreground font-medium mb-10 text-[15px] leading-relaxed max-w-[280px] mx-auto">
-          Your personal companion for tracking prayers, Quran progress, and spiritual growth
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        {trigger}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md rounded-[2rem] p-6 border-border/50">
+        <DialogHeader className="mb-2">
+          <DialogTitle className="font-display text-2xl">Sync across devices</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground mb-5">
+          Sign in only if you want your progress on other devices. This browser already saves your data locally.
         </p>
-
-        {/* Feature pills */}
-        <div className="flex flex-wrap justify-center gap-2 mb-10">
+        <div className="flex flex-wrap justify-center gap-2 mb-6">
           {FEATURES.map(({ icon: Icon, label, color }) => (
             <div
               key={label}
@@ -79,8 +63,6 @@ export default function LoginScreen() {
             </div>
           ))}
         </div>
-
-        {/* Sign in button */}
         <button
           onClick={handleLogin}
           disabled={loading}
@@ -98,22 +80,27 @@ export default function LoginScreen() {
           )}
           {loading ? 'Signing in...' : 'Continue with Google'}
         </button>
-
         {error && (
           <p className="mt-4 text-sm text-destructive font-medium">{error}</p>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-          <p className="mt-8 text-xs text-muted-foreground/60">
-            Your data syncs securely across all your devices
-          </p>
-        </div>
-      </div>
-
-      <footer className="relative z-10 mt-10 text-center">
-        <p className="opposite-theme-signature font-display text-sm font-semibold tracking-wide sm:text-base">
-          Made with 🤲🏻 by Hamza
-        </p>
-      </footer>
-    </div>
+export function SignInButton() {
+  return (
+    <SignInDialog
+      trigger={
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-full h-10 px-3 text-muted-foreground hover:text-foreground"
+          title="Sign in to sync"
+        >
+          Sign in
+        </Button>
+      }
+    />
   );
 }

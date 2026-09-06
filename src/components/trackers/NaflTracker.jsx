@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { useAuthContext } from '@/context/AuthContext';
 import { useCollection } from '@/hooks/useFirestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,8 +27,7 @@ function formatDate(dateStr) {
 }
 
 export default function NaflTracker() {
-  const { user } = useAuthContext();
-  const { items, loading, add, remove } = useCollection(`users/${user.uid}/nafl`);
+  const { items, loading, add, remove } = useCollection('nafl');
   const [isOpen, setIsOpen] = useState(false);
   const [date, setDate] = useState(today());
   const [reason, setReason] = useState('');

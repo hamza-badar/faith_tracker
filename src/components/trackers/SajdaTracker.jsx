@@ -1,65 +1,44 @@
 import { useEffect, useMemo, useRef, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { useAuthContext } from '@/context/AuthContext';
 import { useDocument } from '@/hooks/useFirestore';
 import { useLongPress } from '@/hooks/useLongPress';
 import { Button } from '@/components/ui/button';
 import Skeleton from '@/components/ui/Skeleton';
 import { SAJDA_BUTTONS } from '@/lib/sajda';
 import { User, Minus, Plus } from 'lucide-react';
-import { arrayRemove, arrayUnion, doc, setDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 
 export default function SajdaTracker() {
-  const { user } = useAuthContext();
-  const { data, loading, save } = useDocument(`users/${user.uid}/sajda/count`);
-  const buttonDocPath = `users/${user.uid}/sajda/tilawatButtons`;
-  const buttonDoc = useDocument(buttonDocPath);
+  const { data, loading, save } = useDocument('sajda/count');
+  const { data: buttonData, loading: buttonLoading, save: saveButtons } = useDocument('sajda/tilawatButtons');
 
   const count = data?.count ?? 0;
   const countRef = useRef(count);
   countRef.current = count;
 
   const pressedSet = useMemo(() => {
-    const arr = buttonDoc.data?.pressed;
+    const arr = buttonData?.pressed;
     if (!Array.isArray(arr)) return new Set();
     return new Set(arr.filter((n) => Number.isInteger(n)));
-  }, [buttonDoc.data]);
+  }, [buttonData]);
 
   const resetTimeoutRef = useRef(null);
+  const pressedRef = useRef([]);
+  pressedRef.current = Array.isArray(buttonData?.pressed) ? buttonData.pressed : [];
 
   const persistPress = useCallback(async (idx) => {
-    if (!db || !user?.uid) return;
-    const ref = doc(db, buttonDocPath);
-    try {
-      await updateDoc(ref, { pressed: arrayUnion(idx), updatedAt: Date.now() });
-    } catch (err) {
-      if (err?.code === 'not-found') {
-        await setDoc(ref, { pressed: [idx], updatedAt: Date.now() }, { merge: true });
-        return;
-      }
-      throw err;
-    }
-  }, [buttonDocPath, user?.uid]);
+    const current = pressedRef.current;
+    if (current.includes(idx)) return;
+    await saveButtons({ pressed: [...current, idx], updatedAt: Date.now() });
+  }, [saveButtons]);
 
   const persistUnpress = useCallback(async (idx) => {
-    if (!db || !user?.uid) return;
-    const ref = doc(db, buttonDocPath);
-    try {
-      await updateDoc(ref, { pressed: arrayRemove(idx), updatedAt: Date.now() });
-    } catch (err) {
-      if (err?.code === 'not-found') {
-        await setDoc(ref, { pressed: [], updatedAt: Date.now() }, { merge: true });
-        return;
-      }
-      throw err;
-    }
-  }, [buttonDocPath, user?.uid]);
+    const current = pressedRef.current;
+    await saveButtons({ pressed: current.filter((value) => value !== idx), updatedAt: Date.now() });
+  }, [saveButtons]);
 
   const persistReset = useCallback(async () => {
-    if (!db || !user?.uid) return;
-    await setDoc(doc(db, buttonDocPath), { pressed: [], updatedAt: Date.now() }, { merge: true });
-  }, [buttonDocPath, user?.uid]);
+    await saveButtons({ pressed: [], updatedAt: Date.now() });
+  }, [saveButtons]);
 
   const handleIncrement = useCallback(() => {
     const next = countRef.current + 1;
@@ -104,7 +83,7 @@ export default function SajdaTracker() {
     persistPress(idx).catch(() => toast.error('Failed to update'));
   }, [persistPress, persistUnpress, pressedSet]);
 
-  if (loading || buttonDoc.loading) {
+  if (loading || buttonLoading) {
     return <div className="space-y-4 py-4"><Skeleton className="h-16 w-full rounded-2xl" /></div>;
   }
 
