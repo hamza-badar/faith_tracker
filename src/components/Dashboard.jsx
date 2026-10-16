@@ -13,6 +13,7 @@ import SajdaTracker from '@/components/trackers/SajdaTracker';
 import QazaTracker from '@/components/trackers/QazaTracker';
 import CharityTracker from '@/components/trackers/CharityTracker';
 import IftarTimeTracker from '@/components/trackers/IftarTimeTracker';
+import FridayKahfBanner from '@/components/FridayKahfBanner';
 import { BookOpen, User, Sun, Clock, Heart, LogOut, Utensils } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SignInButton } from '@/components/LoginScreen';
@@ -50,6 +51,8 @@ export default function Dashboard() {
           )}
         </div>
       </header>
+
+      <FridayKahfBanner />
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 mt-8 space-y-6">
         <p className="text-muted-foreground font-medium px-2 mb-8">
