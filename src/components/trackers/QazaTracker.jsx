@@ -59,7 +59,11 @@ function useAllQazaData() {
       allEntries.push({ ...item, prayer: p.id, removeFn: () => data.remove(item.id) });
     });
   }
-  allEntries.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  allEntries.sort((a, b) => {
+    const byDate = (b.date || '').localeCompare(a.date || '');
+    if (byDate !== 0) return byDate;
+    return PRAYERS.findIndex((p) => p.id === a.prayer) - PRAYERS.findIndex((p) => p.id === b.prayer);
+  });
 
   return { prayerData, loading, totalCount, allEntries };
 }
