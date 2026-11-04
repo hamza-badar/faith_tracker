@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useCollection } from '@/hooks/useFirestore';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Clock, Plus, Trash2, Calendar } from 'lucide-react';
+import { ArrowDown, ArrowUp, Clock, Plus, Trash2, Calendar } from 'lucide-react';
 
 const PRAYERS = [
   { id: 'Fajr', label: 'Fajr' },
@@ -41,6 +41,14 @@ function formatDate(dateStr) {
   }
 }
 
+function sortQazaEntries(entries, dateSortDesc) {
+  return [...entries].sort((a, b) => {
+    const byDate = (a.date || '').localeCompare(b.date || '');
+    if (byDate !== 0) return dateSortDesc ? -byDate : byDate;
+    return PRAYERS.findIndex((p) => p.id === a.prayer) - PRAYERS.findIndex((p) => p.id === b.prayer);
+  });
+}
+
 function useAllQazaData() {
   const fajr = useCollection('qaza/Fajr/entries');
   const zuhr = useCollection('qaza/Zuhr/entries');
@@ -59,17 +67,16 @@ function useAllQazaData() {
       allEntries.push({ ...item, prayer: p.id, removeFn: () => data.remove(item.id) });
     });
   }
-  allEntries.sort((a, b) => {
-    const byDate = (b.date || '').localeCompare(a.date || '');
-    if (byDate !== 0) return byDate;
-    return PRAYERS.findIndex((p) => p.id === a.prayer) - PRAYERS.findIndex((p) => p.id === b.prayer);
-  });
-
   return { prayerData, loading, totalCount, allEntries };
 }
 
 export default function QazaTracker() {
   const { prayerData, loading, totalCount, allEntries } = useAllQazaData();
+  const [dateSortDesc, setDateSortDesc] = useState(true);
+  const sortedEntries = useMemo(
+    () => sortQazaEntries(allEntries, dateSortDesc),
+    [allEntries, dateSortDesc],
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [prayer, setPrayer] = useState('Fajr');
   const [date, setDate] = useState(today());
@@ -168,10 +175,23 @@ export default function QazaTracker() {
         </div>
       </div>
 
-      {allEntries.length > 0 && (
+      {sortedEntries.length > 0 && (
         <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-2">Recent Records</h4>
-          {allEntries.map((entry) => (
+          <div className="flex items-center justify-between gap-2 px-2">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Recent Records</h4>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setDateSortDesc((desc) => !desc)}
+              className="h-7 px-2 rounded-lg text-muted-foreground hover:text-foreground"
+              aria-label={dateSortDesc ? 'Show oldest dates first' : 'Show newest dates first'}
+              title={dateSortDesc ? 'Newest first — click for oldest first' : 'Oldest first — click for newest first'}
+            >
+              {dateSortDesc ? <ArrowDown className="w-3.5 h-3.5" /> : <ArrowUp className="w-3.5 h-3.5" />}
+            </Button>
+          </div>
+          {sortedEntries.map((entry) => (
             <div key={entry.id} className="flex items-center justify-between p-4 rounded-2xl bg-card border border-border/50 shadow-sm hover:shadow-md transition-all group">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center text-foreground font-display font-bold text-sm uppercase">
