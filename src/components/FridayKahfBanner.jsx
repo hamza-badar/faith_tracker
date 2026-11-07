@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useDocument } from '@/hooks/useFirestore';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,6 @@ import {
 } from '@/components/ui/dialog';
 import { BookOpen, ChevronRight } from 'lucide-react';
 
-const DISMISS_KEY_PREFIX = 'kahf-banner-dismissed-';
-
 function todayDateKey() {
   const d = new Date();
   const y = d.getFullYear();
@@ -26,43 +24,31 @@ function isFriday() {
   return new Date().getDay() === 5;
 }
 
-function isDismissedToday() {
-  try {
-    return localStorage.getItem(`${DISMISS_KEY_PREFIX}${todayDateKey()}`) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function dismissForToday() {
-  try {
-    localStorage.setItem(`${DISMISS_KEY_PREFIX}${todayDateKey()}`, '1');
-  } catch {
-    /* ignore */
-  }
-}
-
 export default function FridayKahfBanner() {
-  const { save } = useDocument('quran/progress');
+  const { data, loading, save } = useDocument('quran/progress');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [hidden, setHidden] = useState(false);
+  const [pendingHide, setPendingHide] = useState(false);
 
-  const showBanner = useMemo(
-    () => isFriday() && !hidden && !isDismissedToday(),
-    [hidden],
-  );
+  const dateKey = todayDateKey();
+  const answeredToday = data?.kahfFridayDate === dateKey;
+  const showBanner = isFriday() && !loading && !answeredToday && !pendingHide;
 
-  const handleDismiss = () => {
-    dismissForToday();
-    setHidden(true);
+  const closeAfterSave = () => {
+    setPendingHide(true);
     setDialogOpen(false);
   };
 
+  const handleNo = () => {
+    save({ kahfFridayDate: dateKey, kahfRecited: false })
+      .then(() => closeAfterSave())
+      .catch(() => toast.error('Failed to save'));
+  };
+
   const handleYes = () => {
-    save({ updatedAt: Date.now() })
+    save({ updatedAt: Date.now(), kahfFridayDate: dateKey, kahfRecited: true })
       .then(() => {
         toast.success('Surah Al-Kahf recorded');
-        handleDismiss();
+        closeAfterSave();
       })
       .catch(() => toast.error('Failed to update'));
   };
@@ -99,7 +85,7 @@ export default function FridayKahfBanner() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={handleDismiss}>
+            <Button type="button" variant="outline" onClick={handleNo}>
               No
             </Button>
             <Button type="button" onClick={handleYes}>

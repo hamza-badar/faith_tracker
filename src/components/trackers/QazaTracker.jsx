@@ -18,7 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowDown, ArrowUp, Clock, Plus, Trash2, Calendar } from 'lucide-react';
+import { Clock, Plus, Trash2, Calendar } from 'lucide-react';
+import {
+  QAZA_DATE_SORT_STORAGE_KEY,
+  usePersistedDateSortDesc,
+} from '@/hooks/usePersistedDateSort';
+import DateSortToggle from '@/components/trackers/DateSortToggle';
 
 const PRAYERS = [
   { id: 'Fajr', label: 'Fajr' },
@@ -72,7 +77,7 @@ function useAllQazaData() {
 
 export default function QazaTracker() {
   const { prayerData, loading, totalCount, allEntries } = useAllQazaData();
-  const [dateSortDesc, setDateSortDesc] = useState(true);
+  const [dateSortDesc, toggleDateSort] = usePersistedDateSortDesc(QAZA_DATE_SORT_STORAGE_KEY);
   const sortedEntries = useMemo(
     () => sortQazaEntries(allEntries, dateSortDesc),
     [allEntries, dateSortDesc],
@@ -179,17 +184,7 @@ export default function QazaTracker() {
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2 px-2">
             <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Recent Records</h4>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setDateSortDesc((desc) => !desc)}
-              className="h-7 px-2 rounded-lg text-muted-foreground hover:text-foreground"
-              aria-label={dateSortDesc ? 'Show oldest dates first' : 'Show newest dates first'}
-              title={dateSortDesc ? 'Newest first — click for oldest first' : 'Oldest first — click for newest first'}
-            >
-              {dateSortDesc ? <ArrowDown className="w-3.5 h-3.5" /> : <ArrowUp className="w-3.5 h-3.5" />}
-            </Button>
+            <DateSortToggle dateSortDesc={dateSortDesc} onToggle={toggleDateSort} />
           </div>
           {sortedEntries.map((entry) => (
             <div key={entry.id} className="flex items-center justify-between p-4 rounded-2xl bg-card border border-border/50 shadow-sm hover:shadow-md transition-all group">

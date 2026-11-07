@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useCollection } from '@/hooks/useFirestore';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,12 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Sun, Plus, Trash2, Calendar } from 'lucide-react';
+import {
+  NAFL_DATE_SORT_STORAGE_KEY,
+  sortEntriesByDate,
+  usePersistedDateSortDesc,
+} from '@/hooks/usePersistedDateSort';
+import DateSortToggle from '@/components/trackers/DateSortToggle';
 
 function today() {
   return new Date().toISOString().split('T')[0];
@@ -28,6 +34,11 @@ function formatDate(dateStr) {
 
 export default function NaflTracker() {
   const { items, loading, add, remove } = useCollection('nafl');
+  const [dateSortDesc, toggleDateSort] = usePersistedDateSortDesc(NAFL_DATE_SORT_STORAGE_KEY);
+  const sortedItems = useMemo(
+    () => sortEntriesByDate(items, dateSortDesc),
+    [items, dateSortDesc],
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [date, setDate] = useState(today());
   const [reason, setReason] = useState('');
@@ -107,10 +118,13 @@ export default function NaflTracker() {
         </Dialog>
       </div>
 
-      {items.length > 0 ? (
+      {sortedItems.length > 0 ? (
         <div className="space-y-3 mt-6">
-          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-2">History</h4>
-          {items.map((entry) => (
+          <div className="flex items-center justify-between gap-2 px-2">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">History</h4>
+            <DateSortToggle dateSortDesc={dateSortDesc} onToggle={toggleDateSort} />
+          </div>
+          {sortedItems.map((entry) => (
             <div key={entry.id} className="flex items-center justify-between p-4 rounded-2xl bg-card border border-border/50 shadow-sm hover:shadow-md transition-all group">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground">
