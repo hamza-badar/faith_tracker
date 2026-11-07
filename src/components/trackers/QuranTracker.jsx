@@ -5,6 +5,7 @@ import { useLongPress } from '@/hooks/useLongPress';
 import { Button } from '@/components/ui/button';
 import Skeleton from '@/components/ui/Skeleton';
 import { formatUncheckedSajdaReminder, getUncheckedSajdaJuz } from '@/lib/sajda';
+import { getOppositeThemeToastStyle, SAJDA_REMINDER_TOAST_DURATION_MS } from '@/lib/toast';
 import { BookOpen, Minus, Plus } from 'lucide-react';
 
 const MAX_QUARTERS = 120;
@@ -74,7 +75,11 @@ export default function QuranTracker() {
     const reminderMessage = formatUncheckedSajdaReminder(missingSajda);
 
     if (reminderMessage) {
-      toast(reminderMessage, { id: 'sajda-tilawat-reminder' });
+      toast(reminderMessage, {
+        id: 'sajda-tilawat-reminder',
+        duration: SAJDA_REMINDER_TOAST_DURATION_MS,
+        style: getOppositeThemeToastStyle(),
+      });
     }
 
     save({ juz, fraction, updatedAt: Date.now() }).catch(() => toast.error('Failed to update'));
