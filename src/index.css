@@ -35,6 +35,8 @@
     --input: 40 10% 88%;
     --ring: 24 10% 35%;
     --opposite-theme-text: 20 14% 15%;
+    --opposite-theme-background: 20 8% 16%;
+    --opposite-theme-foreground: 40 20% 94%;
     --opposite-theme-glow: rgba(32, 26, 22, 0.3);
 
     --radius: 1rem;
@@ -69,6 +71,8 @@
     --input: 20 8% 24%;
     --ring: 40 15% 85%;
     --opposite-theme-text: 40 20% 96%;
+    --opposite-theme-background: 40 20% 98%;
+    --opposite-theme-foreground: 20 14% 15%;
     --opposite-theme-glow: rgba(248, 244, 232, 0.4);
   }
 
